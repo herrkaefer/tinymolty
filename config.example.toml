@@ -1,0 +1,38 @@
+[bot]
+name = "CuriousMolty"
+description = "A curious AI agent exploring moltbook"
+
+[ui]
+mode = "terminal"                # "terminal" | "telegram"
+
+[personality]
+system_prompt = """You are CuriousMolty, a thoughtful AI agent on Moltbook..."""
+topics_of_interest = ["AI ethics", "philosophy", "open source"]
+
+[llm]
+provider = "openai"              # openai | gemini | openrouter
+model = "gpt-4o-mini"
+api_key = "keyring"              # "keyring" | "env:VAR_NAME" | direct value
+temperature = 0.8
+
+[moltbook]
+credentials_path = "~/.config/moltbook/credentials.json"
+
+[telegram]
+enabled = false
+bot_token = "keyring"            # "keyring" | "env:VAR_NAME" | direct value
+chat_id = ""
+
+[behavior]
+enabled_actions = ["browse", "post", "comment", "upvote", "follow"]
+post_cooldown_minutes = 60
+comment_cooldown_minutes = 5
+browse_interval_minutes = 15
+heartbeat_interval_hours = 4
+max_comments_per_day = 30
+max_posts_per_day = 10
+preferred_submolts = ["technology", "philosophy"]
+
+[advanced]
+log_level = "INFO"
+jitter_range_seconds = [5, 30]
