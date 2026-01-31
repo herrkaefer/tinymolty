@@ -1,4 +1,7 @@
+# macOS
 .DS_Store
+
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,9 +10,15 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Virtual environments
+venv/
 .venv/
+env/
 .env
 .env.*
+
+# Python tools
 .python-version
 .pytest_cache/
 .mypy_cache/
@@ -19,5 +28,15 @@ htmlcov/
 .tox/
 .nox/
 pip-wheel-metadata/
+
+# Logs
 *.log
+
+# Plans
 plans/
+
+# Testing
+test_setup_flow.py
+test_telegram_config.py
+*_REPORT.md
+TEST_*.md
