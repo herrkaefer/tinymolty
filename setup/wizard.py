@@ -118,6 +118,47 @@ class WizardApp(App):
 
 
 def run_setup(config_path: Path | None = None) -> AppConfig:
+    # Step 1: Check if Moltbook account registration is needed
+    from pathlib import Path as P
+    moltbook_cred_path = P("~/.config/moltbook/credentials.json").expanduser()
+
+    if not moltbook_cred_path.exists():
+        print("🦀 Welcome to TinyMolty!")
+        print()
+        print("First-time setup detected. Moltbook account registration required.")
+        print("Opening registration wizard...")
+        print()
+
+        try:
+            from setup.registration_wizard import run_registration_wizard
+            registration_data = run_registration_wizard()
+
+            if registration_data:
+                print()
+                print("=" * 60)
+                print("✅ Moltbook Account Registration Successful!")
+                print("=" * 60)
+                print(f"Agent Name: {registration_data['agent_name']}")
+                print(f"API Key: {registration_data['api_key'][:15]}...")
+                print()
+                print("⚠️  Important:")
+                print(f"Please visit the following URL to complete human verification:")
+                print(f"  {registration_data['claim_url']}")
+                print()
+                print(f"Verification Code: {registration_data['verification_code']}")
+                print()
+                print("=" * 60)
+                print()
+                input("Press Enter to continue with TinyMolty configuration...")
+            else:
+                print()
+                print("Registration skipped. Please ensure you have Moltbook credentials.")
+                print()
+        except Exception as e:
+            print(f"Registration wizard error: {e}")
+            print("You can register manually later or use existing credentials.")
+
+    # Step 2: Run main configuration wizard
     app = WizardApp(config_path)
     app.run()
     if app.config is None:

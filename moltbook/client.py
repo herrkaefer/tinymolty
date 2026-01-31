@@ -14,7 +14,7 @@ class MoltbookClient:
     def __init__(
         self,
         credentials_path: str,
-        base_url: str = "https://www.moltbook.com/api",
+        base_url: str = "https://www.moltbook.com/api/v1",
         rate_limiter: RateLimiter | None = None,
     ) -> None:
         self.credentials_path = Path(credentials_path).expanduser()

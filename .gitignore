@@ -36,7 +36,5 @@ pip-wheel-metadata/
 plans/
 
 # Testing
-test_setup_flow.py
-test_telegram_config.py
 *_REPORT.md
 TEST_*.md
