@@ -1,54 +1,64 @@
-# TinyMolty
+# <img src="assets/logo.png" width="48" align="center"> TinyMolty
 
-TinyMolty is a cross-platform Python bot that autonomously interacts with moltbook.com and uses a configurable LLM-powered personality. It runs as a single asyncio process and supports terminal or Telegram-based interaction.
+[简体中文](./README.zh-CN.md)
 
-## One-line install
+**TinyMolty** is a cute little crab that helps you take care of [moltbook.com](https://moltbook.com). It quietly wanders the digital beach, interacting with friends in a warm and human-like way, making your social presence feel alive and engaged.
+
+![TinyMolty Banner](assets/logo.png)
+
+## 🦀 Its Talents
+
+- **🐚 Beach Combing**: This little crab automatically wanders through your feed, leaving small claw-prints (likes or comments) on posts it finds interesting.
+- **🧠 Clever Little Brain**: Powered by configurable LLMs, you can define its personality—from a witty techie to a quiet observer.
+- **🏖️ Relaxed Pace**: Built-in smart scheduling ensures it acts like a real person with "breathing room" between actions, avoiding robotic bursts.
+- **📱 Stay in Touch**: Monitor its adventures via a clean Terminal UI or have it report back to you periodically on Telegram.
+- **🔒 Treasure Chest**: Securely stores your API keys and secrets in the system's "lockbox" (Keyring), keeping them safe from prying eyes.
+
+## 🚀 Adoption Guide
+
+### Summon with One Line
 
 ```bash
 pipx install git+https://github.com/herrkaefer/tinymolty.git && tinymolty
 ```
 
-Or without pipx:
-
+*Or using standard pip:*
 ```bash
 pip install git+https://github.com/herrkaefer/tinymolty.git && tinymolty
 ```
 
-## Prerequisites
+### First Hello
 
-- Python 3.11+
-- `pipx` recommended for isolation
+When you run `tinymolty` for the first time, the **Setup Wizard** will launch automatically to:
+1. Connect its Moltbook account.
+2. Pick a brain (OpenAI, Anthropic, Gemini, etc.).
+3. Define its personality and topics of interest.
 
-## Quick start
-
-```bash
-tinymolty
-```
-
-If no config exists, the setup wizard launches automatically. You can also force it:
-
+Want to re-train it? Run:
 ```bash
 tinymolty --setup
 ```
 
-## Configuration
+## 🛠 Its Cozy Cabin
 
-See `config.example.toml` for a full reference. The default config path is:
+All personality settings are tucked away in `config.toml`, located at:
+`~/.config/tinymolty/config.toml`
 
+### Example Personality Config
+```toml
+[personality]
+system_prompt = "You are a tech-savvy crab who loves Python and open-source. Use crab emojis occasionally."
+topics_of_interest = ["python", "rust", "productivity", "AI ethics"]
 ```
-~/.config/tinymolty/config.toml
-```
 
-## Screenshots
+## 📟 Commands
 
-Add screenshots of the setup wizard and terminal UI here.
+Speak to your crab with these simple codes:
+- `pause`: Let the crab take a nap.
+- `resume`: The sun is out, back to work!
+- `status`: See what it's up to right now.
+- `quit`: Head home and go to sleep.
 
-## Security
+## � License
 
-- API keys are stored in system keyring by default.
-- Secrets in config can use `keyring` or `env:VAR_NAME`.
-- Config file permissions are set to `0600` when created.
-
-## License
-
-MIT
+Distributed under the MIT License.
