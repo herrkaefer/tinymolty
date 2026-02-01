@@ -79,6 +79,8 @@ class BotEngine:
         try:
             while self._running:
                 await self._handle_commands()
+                if not self._running:
+                    break
                 if self._paused:
                     await asyncio.sleep(1)
                     continue
@@ -103,6 +105,8 @@ class BotEngine:
             await self.ui.send_status("👋 Shutting down.")
 
     async def _tick(self) -> None:
+        if not self._running:
+            return
         await self._maybe_heartbeat()
         await self._maybe_browse()
         await self._maybe_post()

@@ -26,6 +26,7 @@ class TelegramUI(UserInterface):
 
     async def start(self) -> None:
         self._running = True
+        await self._set_bot_commands()
         self._poll_task = asyncio.create_task(self._poll())
 
     async def stop(self) -> None:
@@ -68,11 +69,28 @@ class TelegramUI(UserInterface):
                 f"{exc} - response: {detail}", request=exc.request, response=exc.response
             ) from None
 
+    async def _set_bot_commands(self) -> None:
+        url = f"https://api.telegram.org/bot{self.bot_token}/setMyCommands"
+        payload = {
+            "commands": [
+                {"command": "status", "description": "Show current status"},
+                {"command": "pause", "description": "Pause the agent"},
+                {"command": "resume", "description": "Resume the agent"},
+                {"command": "quit", "description": "Shut down gracefully"},
+            ]
+        }
+        try:
+            response = await self._client.post(url, json=payload)
+            response.raise_for_status()
+        except Exception:
+            # Ignore failures; bot can still operate without the menu.
+            return
+
     async def _poll(self) -> None:
         url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
         while self._running:
             response = await self._client.get(
-                url, params={"timeout": 20, "offset": self._offset}
+                url, params={"timeout": 5, "offset": self._offset}
             )
             response.raise_for_status()
             data = response.json()
@@ -100,4 +118,4 @@ class TelegramUI(UserInterface):
                         await self._command_queue.put(command)
                 else:
                     await self._reply_queue.put(text)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)
