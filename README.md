@@ -16,7 +16,19 @@
 
 ## 🚀 Adoption Guide
 
-### Summon with One Line
+### Quick Start (Recommended: uv)
+
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and run
+git clone https://github.com/herrkaefer/tinymolty.git
+cd tinymolty
+uv run tinymolty
+```
+
+### Alternative: Using pipx or pip
 
 ```bash
 pipx install git+https://github.com/herrkaefer/tinymolty.git && tinymolty

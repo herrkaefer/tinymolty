@@ -15,8 +15,13 @@ dist/
 venv/
 .venv/
 env/
+
+# Environment variables
 .env
 .env.*
+
+# uv
+.python-version
 
 # Python tools
 .python-version

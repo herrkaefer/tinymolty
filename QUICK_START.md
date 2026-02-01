@@ -17,37 +17,37 @@
 
 ---
 
-## 🚀 快速启动（在虚拟环境中）
+## 🚀 快速启动
 
-### 方法 1: 使用现有虚拟环境
-
-如果你已经克隆了仓库并创建了虚拟环境：
+### 方法 1: 使用 uv（推荐）
 
 ```bash
-# 1. 激活虚拟环境
-source venv/bin/activate
+# 1. 安装 uv（如果还没有）
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. 运行 TinyMolty（首次运行会自动启动设置向导）
-python -m tinymolty
-```
-
-### 方法 2: 从头开始
-
-```bash
-# 1. 克隆仓库
+# 2. 克隆仓库
 git clone https://github.com/herrkaefer/tinymolty.git
 cd tinymolty
 
-# 2. 创建虚拟环境
-python3 -m venv venv
+# 3. 运行（uv 会自动管理依赖和虚拟环境）
+uv run tinymolty
+```
 
-# 3. 激活虚拟环境
-source venv/bin/activate
+### 方法 2: 使用传统虚拟环境
 
-# 4. 安装依赖
+如果你已经克隆了仓库：
+
+```bash
+# 1. 创建虚拟环境（如果还没有）
+python3 -m venv .venv
+
+# 2. 激活虚拟环境
+source .venv/bin/activate
+
+# 3. 安装依赖
 pip install -e .
 
-# 5. 运行（首次运行会启动设置向导）
+# 4. 运行
 python -m tinymolty
 ```
 
@@ -138,8 +138,14 @@ chmod 600 ~/.config/moltbook/credentials.json
 
 ### 首次运行
 
+**使用 uv（推荐）：**
 ```bash
-source venv/bin/activate
+uv run tinymolty
+```
+
+**使用传统方式：**
+```bash
+source .venv/bin/activate
 python -m tinymolty
 ```
 
@@ -149,22 +155,30 @@ python -m tinymolty
 
 配置完成后，每次运行：
 
+**使用 uv：**
 ```bash
-source venv/bin/activate
+uv run tinymolty
+```
+
+**使用传统方式：**
+```bash
+source .venv/bin/activate
 python -m tinymolty
 ```
 
 ### 重新配置
 
-如果想修改配置：
-
 ```bash
+uv run tinymolty --setup
+# 或
 python -m tinymolty --setup
 ```
 
 ### 使用自定义配置文件
 
 ```bash
+uv run tinymolty --config /path/to/your/config.toml
+# 或
 python -m tinymolty --config /path/to/your/config.toml
 ```
 
@@ -284,17 +298,22 @@ rm ~/.config/tinymolty/config.toml
 python -m tinymolty  # 重新运行设置向导
 ```
 
-### Q: 虚拟环境每次都要激活吗？
+### Q: 使用 uv 还是传统虚拟环境？
 
-**A**: 是的，每次运行前需要激活：
+**A**: 推荐使用 uv，因为：
+- 更快的依赖解析和安装
+- 自动管理虚拟环境
+- 不需要手动激活
+
+使用 uv：
 ```bash
-source venv/bin/activate
+uv run tinymolty  # 一条命令搞定
 ```
 
-或者安装到系统（不推荐）：
+使用传统方式需要每次激活：
 ```bash
-pip install -e .
-tinymolty
+source .venv/bin/activate
+python -m tinymolty
 ```
 
 ---

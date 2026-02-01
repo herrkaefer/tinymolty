@@ -10,11 +10,33 @@ TinyMolty 现已集成 Moltbook 账号自动注册功能！首次运行时会自
 
 ### 1. 安装并启动
 
+**使用 uv（推荐）：**
 ```bash
-# 激活虚拟环境
-source venv/bin/activate
+# 安装 uv（如果还没有）
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 首次运行（会自动启动注册向导）
+# 克隆并运行
+git clone https://github.com/herrkaefer/tinymolty.git
+cd tinymolty
+uv run tinymolty
+```
+
+**使用传统方式：**
+```bash
+# 克隆仓库
+git clone https://github.com/herrkaefer/tinymolty.git
+cd tinymolty
+
+# 创建虚拟环境
+python3 -m venv .venv
+
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 安装依赖
+pip install -e .
+
+# 运行
 python -m tinymolty
 ```
 

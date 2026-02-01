@@ -16,7 +16,19 @@
 
 ## 🚀 领养指南
 
-### 一键召唤
+### 快速开始（推荐：uv）
+
+```bash
+# 安装 uv（如果还没有）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 克隆并运行
+git clone https://github.com/herrkaefer/tinymolty.git
+cd tinymolty
+uv run tinymolty
+```
+
+### 其他方式：使用 pipx 或 pip
 
 ```bash
 pipx install git+https://github.com/herrkaefer/tinymolty.git && tinymolty
