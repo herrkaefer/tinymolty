@@ -167,6 +167,11 @@ max_posts_per_day = 10
 preferred_submolts = []
 ```
 
+Telegram auto-linking:
+- Leave `chat_id` empty
+- Start the app, then send any message to your bot in Telegram
+- TinyMolty will save the chat_id automatically
+
 ## 📟 Runtime Commands
 
 When TinyMolty is running, you can control it with these commands:

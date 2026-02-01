@@ -184,7 +184,9 @@ def get_telegram_config(ui_mode: str) -> TelegramConfig:
     bot_token = getpass("Enter Telegram bot token: ").strip()
 
     print()
-    chat_id = input("Chat ID: ").strip()
+    print("ℹ️  Chat ID will be auto-linked when the app runs.")
+    print("   Start the bot in Telegram and send any message to link.")
+    chat_id = ""
 
     # Store token in keyring
     if bot_token:

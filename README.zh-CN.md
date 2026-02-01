@@ -167,6 +167,11 @@ max_posts_per_day = 10
 preferred_submolts = []
 ```
 
+Telegram 自动绑定：
+- 保持 `chat_id` 为空
+- 启动应用后在 Telegram 给 bot 发送任意消息
+- TinyMolty 会自动保存 chat_id
+
 ## 📟 运行时命令
 
 TinyMolty 运行时，可以用这些命令控制它：
