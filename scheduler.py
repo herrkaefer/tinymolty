@@ -13,6 +13,7 @@ class Scheduler:
         self.advanced = advanced
         self._last_action: dict[str, datetime] = {}
         self._daily_counts: dict[str, tuple[datetime.date, int]] = {}
+        self._backoff_until: dict[str, datetime] = {}
 
     def _cooldown_seconds(self, action: str) -> int:
         if action == "post":
@@ -43,6 +44,9 @@ class Scheduler:
     def can_do(self, action: str) -> bool:
         if action not in self.behavior.enabled_actions:
             return False
+        backoff_until = self._backoff_until.get(action)
+        if backoff_until and datetime.utcnow() < backoff_until:
+            return False
         last = self._last_action.get(action)
         if last:
             cooldown = timedelta(seconds=self._cooldown_seconds(action))
@@ -57,12 +61,28 @@ class Scheduler:
 
     def record_action(self, action: str) -> None:
         self._last_action[action] = datetime.utcnow()
+        self._backoff_until.pop(action, None)
         max_per_day = self._max_per_day(action)
         if max_per_day is not None:
             day, count = self._daily_counts.get(action, (datetime.utcnow().date(), 0))
             self._daily_counts[action] = (day, count + 1)
 
+    def record_attempt(self, action: str) -> None:
+        # Update last action time without counting toward daily limits.
+        self._last_action[action] = datetime.utcnow()
+
+    def record_backoff(self, action: str, seconds: int) -> None:
+        if seconds <= 0:
+            return
+        until = datetime.utcnow() + timedelta(seconds=seconds)
+        self._backoff_until[action] = until
+
     def next_available_in(self, action: str) -> float:
+        backoff_until = self._backoff_until.get(action)
+        if backoff_until:
+            remaining = (backoff_until - datetime.utcnow()).total_seconds()
+            if remaining > 0:
+                return remaining
         last = self._last_action.get(action)
         if not last:
             return 0.0

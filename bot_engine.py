@@ -5,6 +5,9 @@ import json
 import random
 from typing import Iterable
 
+import httpx
+from email.utils import parsedate_to_datetime
+
 from config import AppConfig
 from llm.base import LLMProvider
 from moltbook.client import MoltbookClient
@@ -217,14 +220,26 @@ class BotEngine:
             post_url = f"https://www.moltbook.com/posts/{response.id}"
             content_preview = content[:60] + "..." if len(content) > 60 else content
             await self.ui.send_status(f"📝 Posted: \"{content_preview}\" - {post_url}")
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if status == 429:
+                retry_after = self._parse_retry_after(e.response.headers)
+                if retry_after:
+                    self.scheduler.record_backoff("post", retry_after)
+                    await self.ui.send_status(
+                        f"❌ Post failed: 429 Too Many Requests - backing off for {retry_after}s"
+                    )
+                else:
+                    await self.ui.send_status("❌ Post failed: 429 Too Many Requests - backing off")
+                    self.scheduler.record_attempt("post")
+            elif status == 403:
+                await self.ui.send_status("❌ Post failed: 403 Forbidden - Account may not be verified")
+                await self.ui.send_status("   Check your claim URL and complete human verification")
+            else:
+                await self.ui.send_status(f"❌ Post failed: HTTP {status} - {e.response.text[:200]}")
         except Exception as e:
             error_msg = str(e)
-            # Provide helpful hints for common errors
-            if "403" in error_msg or "Forbidden" in error_msg:
-                await self.ui.send_status(f"❌ Post failed: 403 Forbidden - Account may not be verified")
-                await self.ui.send_status(f"   Check your claim URL and complete human verification")
-            else:
-                await self.ui.send_status(f"❌ Post failed: {type(e).__name__}: {error_msg}")
+            await self.ui.send_status(f"❌ Post failed: {type(e).__name__}: {error_msg}")
 
     async def _score_posts(self, posts: Iterable[Post]) -> list[Post]:
         prompt_lines = [
@@ -277,6 +292,29 @@ class BotEngine:
         except Exception as e:
             await self.ui.send_status(f"⚠️  LLM comment generation failed ({type(e).__name__}), using fallback")
             return "Interesting perspective! Thanks for sharing."
+
+    def _parse_retry_after(self, headers: httpx.Headers) -> int | None:
+        # Prefer standard Retry-After (seconds or HTTP date), then X-RateLimit-Reset (epoch seconds)
+        retry_after = headers.get("Retry-After") or headers.get("retry-after")
+        if retry_after:
+            try:
+                return max(0, int(float(retry_after)))
+            except ValueError:
+                try:
+                    dt = parsedate_to_datetime(retry_after)
+                    seconds = int((dt - datetime.utcnow()).total_seconds())
+                    return max(0, seconds)
+                except Exception:
+                    pass
+        reset = headers.get("X-RateLimit-Reset") or headers.get("x-ratelimit-reset")
+        if reset:
+            try:
+                reset_ts = int(float(reset))
+                seconds = int(reset_ts - datetime.utcnow().timestamp())
+                return max(0, seconds)
+            except ValueError:
+                return None
+        return None
 
     async def _generate_post(self) -> str:
         posts_summary: list[str] = []

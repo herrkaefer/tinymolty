@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class AgentProfile(BaseModel):
-    id: str
-    username: str
+    id: str | None = None
+    username: str | None = None
     display_name: str | None = None
 
 
