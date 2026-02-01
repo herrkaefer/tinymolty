@@ -41,10 +41,12 @@ class TelegramUI(UserInterface):
         return self._command_queue.get_nowait()
 
     async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
-        summary = message
-        if next_action_seconds is not None:
-            summary += f" | next action ~{int(next_action_seconds)}s"
-        await self.send_status(summary)
+        # In Telegram mode, only send key activities, skip routine status updates
+        # Skip messages like "Sleeping" to avoid spam
+        if message.lower().startswith("sleeping"):
+            return
+        # Send key activities only
+        await self.send_status(message)
 
     async def _send_message(self, text: str) -> None:
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"

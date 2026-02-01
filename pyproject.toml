@@ -9,13 +9,13 @@ dependencies = [
     "pydantic>=2.0",
     "openai>=1.0",
     "google-genai>=1.0",
-    "textual>=1.0",
     "keyring>=25.0",
     "tomli-w>=1.0",
+    "rich>=13.0",
 ]
 
 [project.scripts]
-tinymolty = "__main__:main"
+tinymolty = "tinymolty_main:main"
 
 [project.urls]
 Homepage = "https://github.com/herrkaefer/tinymolty"
@@ -27,4 +27,4 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["llm", "moltbook", "setup", "telegram", "ui"]
-py-modules = ["__main__", "app", "bot_engine", "config", "scheduler"]
+py-modules = ["__main__", "app", "bot_engine", "config", "scheduler", "tinymolty_main"]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+from datetime import datetime
 from typing import Deque
 
 from rich.console import Console
@@ -35,8 +36,13 @@ class TerminalUI(UserInterface):
                 task.cancel()
         await asyncio.sleep(0)
 
+    def _log_with_timestamp(self, message: str) -> None:
+        """Add a timestamped log entry"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self._logs.append(f"[{timestamp}] {message}")
+
     async def send_status(self, message: str) -> None:
-        self._logs.append(message)
+        self._log_with_timestamp(message)
 
     async def prompt(self, message: str) -> str:
         self.console.print(message)
@@ -48,8 +54,14 @@ class TerminalUI(UserInterface):
         return self._command_queue.get_nowait()
 
     async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
+        """Update current activity and log it"""
         self._activity = message
         self._next_action_seconds = next_action_seconds
+        # In terminal mode, log all activities for detailed output
+        if next_action_seconds is not None:
+            self._log_with_timestamp(f"{message} (next action in ~{int(next_action_seconds)}s)")
+        else:
+            self._log_with_timestamp(message)
 
     async def _read_input(self) -> None:
         while self._running:
@@ -72,7 +84,8 @@ class TerminalUI(UserInterface):
         header = Text(f"Activity: {self._activity}")
         if self._next_action_seconds is not None:
             header.append(f" | Next action in ~{int(self._next_action_seconds)}s")
-        body = "\n".join(list(self._logs)[-15:]) or "No activity yet."
+        # Show more logs in terminal for detailed output
+        body = "\n".join(list(self._logs)[-30:]) or "No activity yet."
         return Panel(body, title=header, border_style="green")
 
     async def _run_live(self) -> None:

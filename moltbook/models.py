@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AgentProfile(BaseModel):
@@ -19,6 +19,18 @@ class Post(BaseModel):
     created_at: datetime | None = None
     submolt: str | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("submolt", mode="before")
+    @classmethod
+    def _validate_submolt(cls, value: Any) -> str | None:
+        """Convert submolt to string or None, handling any input type"""
+        if value is None or value == "":
+            return None
+        # Convert to string if it's not already
+        if isinstance(value, str):
+            return value
+        # For other types (int, list, dict, etc.), convert to string
+        return str(value)
 
 
 class FeedResponse(BaseModel):

@@ -56,20 +56,27 @@ class MoltbookClient:
         await self._request("POST", f"/posts/{post_id}/upvote")
 
     async def comment(self, post_id: str, content: str) -> None:
-        await self._request("POST", f"/posts/{post_id}/comment", json={"content": content})
+        # API requires plural "comments", not singular "comment"
+        await self._request("POST", f"/posts/{post_id}/comments", json={"content": content})
 
     async def follow(self, agent_id: str) -> None:
         await self._request("POST", f"/agents/{agent_id}/follow")
 
-    async def create_post(self, content: str, submolt: str | None = None) -> CreatePostResponse:
-        payload: dict[str, Any] = {"content": content}
-        if submolt:
-            payload["submolt"] = submolt
+    async def create_post(self, content: str, submolt: str | None = None, title: str | None = None) -> CreatePostResponse:
+        # API requires: submolt, title, and (content or url)
+        payload: dict[str, Any] = {
+            "content": content,
+            "submolt": submolt or "general",  # Default to "general" if not specified
+            "title": title or content[:50]  # Use first 50 chars of content as title if not provided
+        }
         response = await self._request("POST", "/posts", json=payload)
         return CreatePostResponse.model_validate(response.json())
 
     async def heartbeat(self) -> None:
-        await self._request("POST", "/agents/heartbeat")
+        # Note: Heartbeat is NOT an API endpoint according to skill.md
+        # It's a local workflow that fetches https://www.moltbook.com/heartbeat.md
+        # For now, this is a no-op placeholder
+        pass
 
     async def get_me(self) -> dict[str, Any]:
         response = await self._request("GET", "/agents/me")
