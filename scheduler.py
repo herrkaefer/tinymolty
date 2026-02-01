@@ -77,6 +77,9 @@ class Scheduler:
         until = datetime.utcnow() + timedelta(seconds=seconds)
         self._backoff_until[action] = until
 
+    def clear_backoff(self, action: str) -> None:
+        self._backoff_until.pop(action, None)
+
     def next_available_in(self, action: str) -> float:
         backoff_until = self._backoff_until.get(action)
         if backoff_until:

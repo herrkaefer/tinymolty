@@ -32,6 +32,7 @@ class BotEngine:
         self.ui = ui
         self._running = False
         self._paused = False
+        self._post_failures = 0
 
     async def run(self) -> None:
         self._running = True
@@ -114,7 +115,19 @@ class BotEngine:
             ]
         )
         await self.ui.update_activity("Sleeping", next_wait)
-        await self.scheduler.sleep_with_jitter(max(5.0, next_wait))
+        if next_wait <= 0:
+            return
+        await self._sleep_interruptible(next_wait)
+
+    async def _sleep_interruptible(self, base_seconds: float) -> None:
+        remaining = base_seconds + self.scheduler.jitter()
+        while remaining > 0 and self._running:
+            await self._handle_commands()
+            if self._paused:
+                break
+            step = min(0.5, remaining)
+            await asyncio.sleep(step)
+            remaining -= step
 
     async def _maybe_heartbeat(self) -> None:
         if not self.scheduler.can_do("heartbeat"):
@@ -220,26 +233,29 @@ class BotEngine:
             post_url = f"https://www.moltbook.com/posts/{response.id}"
             content_preview = content[:60] + "..." if len(content) > 60 else content
             await self.ui.send_status(f"📝 Posted: \"{content_preview}\" - {post_url}")
+            self._post_failures = 0
+        except httpx.ReadTimeout:
+            await self._handle_post_failure("ReadTimeout")
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status == 429:
                 retry_after = self._parse_retry_after(e.response.headers)
-                if retry_after:
-                    self.scheduler.record_backoff("post", retry_after)
-                    await self.ui.send_status(
-                        f"❌ Post failed: 429 Too Many Requests - backing off for {retry_after}s"
-                    )
-                else:
-                    await self.ui.send_status("❌ Post failed: 429 Too Many Requests - backing off")
-                    self.scheduler.record_attempt("post")
+                backoff = retry_after or self.config.behavior.post_cooldown_minutes * 60
+                self.scheduler.record_backoff("post", backoff)
+                await self.ui.send_status(
+                    f"❌ Post failed: 429 Too Many Requests - backing off for {backoff}s"
+                )
             elif status == 403:
                 await self.ui.send_status("❌ Post failed: 403 Forbidden - Account may not be verified")
                 await self.ui.send_status("   Check your claim URL and complete human verification")
+                await self._handle_post_failure("403 Forbidden")
             else:
                 await self.ui.send_status(f"❌ Post failed: HTTP {status} - {e.response.text[:200]}")
+                await self._handle_post_failure(f"HTTP {status}")
         except Exception as e:
             error_msg = str(e)
             await self.ui.send_status(f"❌ Post failed: {type(e).__name__}: {error_msg}")
+            await self._handle_post_failure(type(e).__name__)
 
     async def _score_posts(self, posts: Iterable[Post]) -> list[Post]:
         prompt_lines = [
@@ -315,6 +331,21 @@ class BotEngine:
             except ValueError:
                 return None
         return None
+
+    async def _handle_post_failure(self, reason: str) -> None:
+        self._post_failures += 1
+        if self._post_failures >= 3:
+            self._post_failures = 0
+            backoff = self.config.behavior.post_cooldown_minutes * 60
+            self.scheduler.record_backoff("post", backoff)
+            await self.ui.send_status(
+                f"⏳ Post paused after 3 failures ({reason}); cooldown {backoff}s"
+            )
+        else:
+            self.scheduler.record_backoff("post", 30)
+            await self.ui.send_status(
+                f"⏱️  Post retry in 30s ({self._post_failures}/3) - {reason}"
+            )
 
     async def _generate_post(self) -> str:
         posts_summary: list[str] = []

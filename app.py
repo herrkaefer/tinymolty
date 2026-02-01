@@ -21,6 +21,7 @@ def _telegram_filter(enabled_actions: list[str]):
         "browse": ["browse", "feed", "fetched"],
         "heartbeat": ["heartbeat"],
     }
+    command_keywords = ["paused", "resumed", "running", "status", "shutting down", "quit"]
     enabled = set(enabled_actions)
 
     def should_send(message: str) -> bool:
@@ -29,6 +30,9 @@ def _telegram_filter(enabled_actions: list[str]):
             return True
         if "❌" in message or "⚠️" in message or "error" in lowered or "failed" in lowered:
             return True
+        for keyword in command_keywords:
+            if keyword in lowered:
+                return True
         for action in enabled:
             for keyword in action_keywords.get(action, []):
                 if keyword in lowered:
