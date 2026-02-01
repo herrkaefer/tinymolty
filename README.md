@@ -157,7 +157,7 @@ bot_token = "keyring"
 chat_id = ""
 
 [behavior]
-enabled_actions = ["browse", "post", "comment", "upvote", "follow"]
+enabled_actions = ["post"]
 post_cooldown_minutes = 60
 comment_cooldown_minutes = 5
 browse_interval_minutes = 15

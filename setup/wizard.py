@@ -205,7 +205,10 @@ def get_moltbook_config() -> MoltbookConfig:
     return MoltbookConfig(credentials_path=path)
 
 
-def run_configuration_wizard(registration_data: dict | None = None) -> AppConfig:
+def run_configuration_wizard(
+    registration_data: dict | None = None,
+    credentials_path: str | None = None,
+) -> AppConfig:
     """Run the interactive configuration wizard"""
     print()
     print("=" * 60)
@@ -219,6 +222,8 @@ def run_configuration_wizard(registration_data: dict | None = None) -> AppConfig
     default_name = "CuriousMolty"
     default_desc = "A curious AI agent exploring moltbook"
 
+    cred_path = credentials_path or "~/.config/moltbook/credentials.json"
+
     if registration_data:
         # New registration - use the just-registered agent name
         default_name = registration_data.get("agent_name", default_name)
@@ -226,7 +231,7 @@ def run_configuration_wizard(registration_data: dict | None = None) -> AppConfig
         # Using existing credentials - try to load agent name from credentials
         try:
             from moltbook.registration import load_credentials
-            creds = load_credentials()
+            creds = load_credentials(credentials_path=cred_path)
             if creds and "agent_name" in creds:
                 default_name = creds["agent_name"]
         except Exception:
@@ -286,7 +291,7 @@ def run_setup(config_path: Path | None = None) -> AppConfig:
         try:
             import json
             from moltbook.registration import load_credentials
-            creds = load_credentials()
+            creds = load_credentials(credentials_path=moltbook_cred_path)
             if creds:
                 print("✓ Found existing Moltbook account:")
                 print(f"  Agent: {creds.get('agent_name', 'Unknown')}")
@@ -296,7 +301,10 @@ def run_setup(config_path: Path | None = None) -> AppConfig:
 
     try:
         from setup.registration_wizard import run_registration_wizard
-        registration_data = run_registration_wizard(credentials_exist=credentials_exist)
+        registration_data = run_registration_wizard(
+            credentials_exist=credentials_exist,
+            credentials_path=str(moltbook_cred_path),
+        )
 
         if registration_data:
             print()
@@ -316,7 +324,10 @@ def run_setup(config_path: Path | None = None) -> AppConfig:
         sys.exit(1)
 
     # Step 2: Run main configuration wizard
-    config = run_configuration_wizard(registration_data=registration_data)
+    config = run_configuration_wizard(
+        registration_data=registration_data,
+        credentials_path=str(moltbook_cred_path),
+    )
 
     # Save configuration
     path = config_path

@@ -52,6 +52,17 @@ class MoltbookClient:
         posts = [Post.model_validate(item | {"raw": item}) for item in payload.get("posts", [])]
         return FeedResponse(posts=posts)
 
+    async def get_posts(self, sort: str = "hot", limit: int = 25, submolt: str | None = None) -> FeedResponse:
+        params = [f"sort={sort}", f"limit={limit}"]
+        if submolt:
+            path = f"/submolts/{submolt}/feed?{'&'.join(params)}"
+        else:
+            path = f"/posts?{'&'.join(params)}"
+        response = await self._request("GET", path)
+        payload = response.json()
+        posts = [Post.model_validate(item | {"raw": item}) for item in payload.get("posts", [])]
+        return FeedResponse(posts=posts)
+
     async def upvote(self, post_id: str) -> None:
         await self._request("POST", f"/posts/{post_id}/upvote")
 

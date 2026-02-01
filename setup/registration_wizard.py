@@ -68,7 +68,11 @@ def get_agent_info() -> tuple[str, str] | None:
             print()
 
 
-async def register_agent_cli(name: str, description: str) -> dict | None:
+async def register_agent_cli(
+    name: str,
+    description: str,
+    credentials_path: str | None = None,
+) -> dict | None:
     """Register agent and return registration data"""
     from moltbook.registration import register_agent, save_credentials
 
@@ -80,7 +84,11 @@ async def register_agent_cli(name: str, description: str) -> dict | None:
         response = await register_agent(name, description)
 
         # Save credentials
-        cred_path = save_credentials(response.api_key, response.agent_name)
+        cred_path = save_credentials(
+            response.api_key,
+            response.agent_name,
+            credentials_path=credentials_path or "~/.config/moltbook/credentials.json",
+        )
 
         # Print success message
         print("=" * 60)
@@ -153,7 +161,10 @@ async def register_agent_cli(name: str, description: str) -> dict | None:
         return None
 
 
-def run_registration_wizard(credentials_exist: bool = False) -> dict | None:
+def run_registration_wizard(
+    credentials_exist: bool = False,
+    credentials_path: str | None = None,
+) -> dict | None:
     """
     Run the registration wizard
 
@@ -188,8 +199,8 @@ def run_registration_wizard(credentials_exist: bool = False) -> dict | None:
                 print("⚠️  This will create a NEW account.")
                 print("   Your existing credentials will be replaced.")
                 print()
-                confirm = input("Continue with new registration? (y/n): ").lower().strip()
-                if confirm == 'y':
+                confirm = input("Continue with new registration? (y/n) [y]: ").lower().strip()
+                if confirm == '' or confirm == 'y':
                     break
                 print()
                 return None
@@ -238,7 +249,13 @@ def run_registration_wizard(credentials_exist: bool = False) -> dict | None:
         print("Step 2: Creating Moltbook Account")
         print("-" * 60)
 
-        result = asyncio.run(register_agent_cli(name, description))
+        result = asyncio.run(
+            register_agent_cli(
+                name,
+                description,
+                credentials_path=credentials_path,
+            )
+        )
         if result:
             # Success!
             return result

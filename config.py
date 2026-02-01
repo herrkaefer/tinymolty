@@ -54,7 +54,7 @@ class TelegramConfig(BaseModel):
 
 class BehaviorConfig(BaseModel):
     enabled_actions: list[str] = Field(
-        default_factory=lambda: ["browse", "post", "comment", "upvote", "follow"]
+        default_factory=lambda: ["post"]
     )
     post_cooldown_minutes: int = 60
     comment_cooldown_minutes: int = 5

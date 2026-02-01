@@ -279,10 +279,23 @@ class BotEngine:
             return "Interesting perspective! Thanks for sharing."
 
     async def _generate_post(self) -> str:
+        posts_summary: list[str] = []
+        try:
+            hot_feed = await self.client.get_posts(sort="hot", limit=8)
+            for post in hot_feed.posts:
+                content = post.content.strip().replace("\n", " ")
+                if not content:
+                    continue
+                posts_summary.append(f"- {content[:160]}")
+        except Exception:
+            posts_summary = []
+
         prompt = (
             "Create an original post for Moltbook. Keep it under 500 characters.\n"
             f"Topics: {', '.join(self.config.personality.topics_of_interest)}"
         )
+        if posts_summary:
+            prompt += "\n\nRecent hot posts for context (do not quote verbatim):\n" + "\n".join(posts_summary)
         try:
             response = await self.llm.generate(self.config.personality.system_prompt, prompt)
             return response.content.strip()[:500]
