@@ -46,8 +46,14 @@ class MoltbookClient:
         response.raise_for_status()
         return response
 
-    async def get_feed(self) -> FeedResponse:
-        response = await self._request("GET", "/feed")
+    async def get_feed(self, sort: str | None = None, limit: int | None = None) -> FeedResponse:
+        params: list[str] = []
+        if sort:
+            params.append(f"sort={sort}")
+        if limit is not None:
+            params.append(f"limit={limit}")
+        path = "/feed" if not params else f"/feed?{'&'.join(params)}"
+        response = await self._request("GET", path)
         payload = response.json()
         posts = [Post.model_validate(item | {"raw": item}) for item in payload.get("posts", [])]
         return FeedResponse(posts=posts)

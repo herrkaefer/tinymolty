@@ -11,7 +11,7 @@ from email.utils import parsedate_to_datetime
 from config import AppConfig
 from llm.base import LLMProvider
 from moltbook.client import MoltbookClient
-from moltbook.models import Post
+from moltbook.models import FeedResponse, Post
 from scheduler import Scheduler
 from ui.base import UserInterface
 
@@ -149,7 +149,23 @@ class BotEngine:
             return
         try:
             await self.ui.update_activity("🦀 Browsing feed")
-            feed = await self.client.get_feed()
+            feed_sort = self.config.behavior.feed_sort
+            feed_limit = self.config.behavior.feed_limit
+            if feed_sort == "both":
+                new_limit = (feed_limit + 1) // 2
+                hot_limit = feed_limit // 2
+                new_feed = await self.client.get_feed(sort="new", limit=new_limit)
+                hot_feed = await self.client.get_feed(sort="hot", limit=hot_limit)
+                seen_ids: set[str] = set()
+                combined: list[Post] = []
+                for post in list(new_feed.posts) + list(hot_feed.posts):
+                    if post.id in seen_ids:
+                        continue
+                    seen_ids.add(post.id)
+                    combined.append(post)
+                feed = FeedResponse(posts=combined)
+            else:
+                feed = await self.client.get_feed(sort=feed_sort, limit=feed_limit)
             self.scheduler.record_action("browse")
 
             # Show feed stats
@@ -175,7 +191,7 @@ class BotEngine:
     async def _maybe_interact(self, posts: list[Post]) -> None:
         interacted = False
         for post in posts:
-            post_url = f"https://www.moltbook.com/posts/{post.id}"
+            post_url = f"https://www.moltbook.com/post/{post.id}"
             post_preview = post.content[:50] + "..." if len(post.content) > 50 else post.content
 
             if self.scheduler.can_do("comment"):
@@ -234,7 +250,7 @@ class BotEngine:
             )
             self.scheduler.record_action("post")
 
-            post_url = f"https://www.moltbook.com/posts/{response.id}"
+            post_url = f"https://www.moltbook.com/post/{response.id}"
             content_preview = content[:60] + "..." if len(content) > 60 else content
             await self.ui.send_status(f"📝 Posted: \"{content_preview}\" - {post_url}")
             self._post_failures = 0

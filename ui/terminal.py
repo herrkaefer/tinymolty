@@ -20,6 +20,7 @@ class TerminalUI(UserInterface):
         self._logs: Deque[str] = deque(maxlen=200)
         self._activity: str = "Idle"
         self._next_action_seconds: float | None = None
+        self._last_activity_log: tuple[str, int | None] | None = None
         self._live_task: asyncio.Task | None = None
         self._input_task: asyncio.Task | None = None
         self._running = False
@@ -59,8 +60,17 @@ class TerminalUI(UserInterface):
         self._next_action_seconds = next_action_seconds
         # In terminal mode, log all activities for detailed output
         if next_action_seconds is not None:
-            self._log_with_timestamp(f"{message} (next action in ~{int(next_action_seconds)}s)")
+            display_seconds = int(next_action_seconds)
+            log_key = (message, display_seconds)
+            if log_key == self._last_activity_log:
+                return
+            self._last_activity_log = log_key
+            self._log_with_timestamp(f"{message} (next action in ~{display_seconds}s)")
         else:
+            log_key = (message, None)
+            if log_key == self._last_activity_log:
+                return
+            self._last_activity_log = log_key
             self._log_with_timestamp(message)
 
     async def _read_input(self) -> None:

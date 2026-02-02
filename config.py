@@ -60,9 +60,18 @@ class BehaviorConfig(BaseModel):
     comment_cooldown_minutes: int = 5
     browse_interval_minutes: int = 15
     heartbeat_interval_hours: int = 4
+    feed_sort: Literal["new", "hot", "both"] = "new"
+    feed_limit: int = 25
     max_comments_per_day: int = 30
     max_posts_per_day: int = 10
     preferred_submolts: list[str] = Field(default_factory=list)
+
+    @field_validator("feed_limit")
+    @classmethod
+    def _feed_limit_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("feed_limit must be a positive integer")
+        return value
 
 
 class AdvancedConfig(BaseModel):
