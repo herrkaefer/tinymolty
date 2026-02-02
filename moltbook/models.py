@@ -38,4 +38,6 @@ class FeedResponse(BaseModel):
 
 
 class CreatePostResponse(BaseModel):
-    id: str
+    id: str | None = None
+    success: bool | None = None
+    message: str | None = None

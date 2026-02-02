@@ -1,41 +1,43 @@
 import asyncio
 import json
+import os
 from pathlib import Path
-import httpx
 
-async def test():
+import httpx
+import pytest
+
+
+def test_create_post_integration() -> None:
+    if os.getenv("TINYMOLTY_INTEGRATION_TESTS") != "1":
+        pytest.skip("Integration test (set TINYMOLTY_INTEGRATION_TESTS=1 to run)")
+
     cred_path = Path("~/.config/moltbook/credentials.json").expanduser()
-    with open(cred_path) as f:
-        api_key = json.load(f)["api_key"]
-    
-    headers = {"Authorization": f"Bearer {api_key}"}
-    
-    async with httpx.AsyncClient() as client:
-        # Get my subscriptions first
-        me_resp = await client.get(
-            "https://www.moltbook.com/api/v1/agents/me",
-            headers=headers
-        )
-        subs = me_resp.json()["agent"]["stats"]["subscriptions"]
-        print(f"I have {subs} subscriptions")
-        
-        # Try creating a post in general
-        payload = {
-            "submolt": "introductions",
-            "title": "Hello from TinyMolty",
-            "content": "Just testing the API. Please ignore this test post!"
-        }
-        
-        try:
+    if not cred_path.exists():
+        pytest.skip(f"Missing credentials at {cred_path}")
+
+    async def _run() -> None:
+        with open(cred_path) as f:
+            api_key = json.load(f)["api_key"]
+
+        headers = {"Authorization": f"Bearer {api_key}"}
+
+        async with httpx.AsyncClient() as client:
+            me_resp = await client.get(
+                "https://www.moltbook.com/api/v1/agents/me",
+                headers=headers,
+            )
+            assert me_resp.status_code < 500, me_resp.text[:200]
+
+            payload = {
+                "submolt": "introductions",
+                "title": "Hello from TinyMolty",
+                "content": "Just testing the API. Please ignore this test post!",
+            }
             resp = await client.post(
                 "https://www.moltbook.com/api/v1/posts",
                 headers=headers,
-                json=payload
+                json=payload,
             )
-            print(f"\nCreate post: {resp.status_code}")
-            print(f"Response: {resp.text}")
-        except httpx.HTTPStatusError as e:
-            print(f"\nCreate post: {e.response.status_code}")
-            print(f"Response: {e.response.text}")
+            assert resp.status_code < 500, resp.text[:200]
 
-asyncio.run(test())
+    asyncio.run(_run())

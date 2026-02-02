@@ -7,6 +7,7 @@ from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.message import Message
+from textual.worker import Worker, WorkerState
 from textual.widgets import Input, Log, Static
 
 from bot_engine import BotEngine
@@ -20,6 +21,10 @@ class StatusMessage(Message):
     def __init__(self, text: str) -> None:
         super().__init__()
         self.text = text
+
+
+class QuitRequest(Message):
+    pass
 
 
 class _UILog(Log):
@@ -109,6 +114,30 @@ class TinyMoltyApp(App):
         if self._client:
             await self._client.close()
 
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        worker = event.worker
+        if worker.state != WorkerState.ERROR:
+            return
+
+        error = getattr(worker, "error", None)
+        error_text = f"{type(error).__name__}: {error}" if error else "Unknown error"
+
+        if worker.name == "commands":
+            self.post_message(
+                StatusMessage(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Command worker crashed; restarting. ({error_text[:200]})"
+                )
+            )
+            self.run_worker(self._command_loop(), name="commands", group="commands")
+            return
+
+        if worker.name == "engine":
+            self.post_message(
+                StatusMessage(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] ❌ Engine worker crashed; please restart the app. ({error_text[:200]})"
+                )
+            )
+
     @on(StatusMessage)
     def _on_status(self, message: StatusMessage) -> None:
         self.query_one(_UILog).write_line(message.text)
@@ -120,6 +149,8 @@ class TinyMoltyApp(App):
         if value:
             # Put into a queue; command loop processes sequentially.
             self._command_queue.put_nowait(value)
+            # Echo the command to show it was received
+            self.post_message(StatusMessage(f"[{datetime.now().strftime('%H:%M:%S')}] > {value}"))
 
     async def _command_loop(self) -> None:
         while True:
@@ -128,7 +159,20 @@ class TinyMoltyApp(App):
                 self.post_message(StatusMessage(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Engine not ready"))
                 continue
             # Never run slow command parsing in the input handler; keep it in a worker task.
-            await self._engine.handle_command(cmd)
+            try:
+                await self._engine.handle_command(cmd)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.post_message(
+                    StatusMessage(
+                        f"[{datetime.now().strftime('%H:%M:%S')}] ❌ Command handler error: {type(exc).__name__}: {str(exc)[:200]}"
+                    )
+                )
+                continue
+
+            if not self._engine._running:
+                self.post_message(QuitRequest())
 
     async def _run_engine(self) -> None:
         if not self.secrets.llm_api_key:
@@ -152,3 +196,7 @@ class TinyMoltyApp(App):
             label.append("\n")
             label.append(profile_url, style=f"link {profile_url} underline")
         self.query_one("#header", Static).update(label)
+
+    @on(QuitRequest)
+    def _on_quit_request(self, _: QuitRequest) -> None:
+        self.exit()

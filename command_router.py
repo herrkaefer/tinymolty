@@ -56,7 +56,8 @@ class CommandRouter:
                 raw=raw,
                 error=f"{type(exc).__name__}",
             )
-        command = response.content.strip().lower().split()[0] if response.content else "none"
+        tokens = response.content.strip().lower().split() if response.content else []
+        command = tokens[0] if tokens else "none"
         return CommandParseResult(
             command=command if command in self._allowed() else "none",
             source="llm",

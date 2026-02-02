@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+from datetime import datetime
 from typing import Iterable
 
 import httpx
@@ -95,11 +96,34 @@ class BotEngine:
                 await self.ui.send_status(f"⚠️  Could not verify account: {type(e).__name__}: {error_msg[:80]}")
             await self.ui.send_status(f"   Continuing anyway - browse should work with valid API key")
 
+        await self.ui.send_status("🔄 Engine loop started. Use /status /pause /resume /quit for control.")
+
+        # Show initial scheduler state
+        next_actions = []
+        for action in ["browse", "post", "comment", "heartbeat"]:
+            wait = self.scheduler.next_available_in(action)
+            if wait > 0:
+                next_actions.append(f"{action}={int(wait)}s")
+            else:
+                next_actions.append(f"{action}=ready")
+        await self.ui.send_status(f"   Initial state: {', '.join(next_actions)}")
+
         while self._running:
             if self._paused:
                 await asyncio.sleep(0.2)
                 continue
-            await self._tick()
+            try:
+                await self._tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                try:
+                    await self.ui.send_status(
+                        f"❌ Engine loop error: {type(exc).__name__}: {str(exc)[:200]}"
+                    )
+                except Exception:
+                    pass
+                await asyncio.sleep(5)
 
     async def _handle_commands(self) -> None:
         # Kept for compatibility with older call sites; command_pump is the primary mechanism.
@@ -133,7 +157,17 @@ class BotEngine:
             self._paused = False
             await self.ui.send_status("▶️  Resumed.")
         elif command == "status":
-            await self.ui.send_status("🦀 Running." if not self._paused else "⏸️  Paused.")
+            state = "⏸️  Paused" if self._paused else "🦀 Running"
+            await self.ui.send_status(f"{state}")
+            # Show next action times
+            next_actions = []
+            for action in ["browse", "post", "comment", "heartbeat"]:
+                wait = self.scheduler.next_available_in(action)
+                if wait > 0:
+                    next_actions.append(f"{action}={int(wait)}s")
+                else:
+                    next_actions.append(f"{action}=ready")
+            await self.ui.send_status(f"   Next: {', '.join(next_actions)}")
         elif command == "help":
             await self.ui.send_status("⌨️ Commands: /pause /resume /status /quit /help")
         elif command == "quit":
@@ -156,12 +190,19 @@ class BotEngine:
                 self.scheduler.next_available_in("heartbeat"),
             ]
         )
+        # CRITICAL: Always yield control, even if actions are ready.
+        # This prevents tight loops that starve the event loop.
         if next_wait <= 0:
+            # Small yield to let other tasks (command handler, UI) run
+            await asyncio.sleep(0.1)
             return
+        # Show what we're waiting for
+        await self.ui.update_activity(f"⏱️ Next action in {int(next_wait)}s")
         await self._sleep_interruptible(next_wait)
 
     async def _sleep_interruptible(self, base_seconds: float) -> None:
-        remaining = base_seconds + self.scheduler.jitter()
+        remaining = max(0.0, base_seconds) + self.scheduler.jitter()
+        remaining = max(0.0, remaining)
         while remaining > 0 and self._running:
             if self._paused:
                 break
@@ -286,6 +327,12 @@ class BotEngine:
                 if self.config.behavior.preferred_submolts
                 else None,
             )
+
+            # Check if we got a valid post ID
+            if not response.id:
+                error_detail = response.message or "No post ID returned"
+                raise ValueError(f"API returned success but no post ID: {error_detail}")
+
             self.scheduler.record_action("post")
 
             post_url = f"https://www.moltbook.com/post/{response.id}"
