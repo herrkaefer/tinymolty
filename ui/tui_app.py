@@ -64,8 +64,13 @@ class _TextualUIAdapter:
         # For now we don't render activity in the header (keeps UI stable and uncluttered).
         return
 
-    def set_agent_info(self, name: str, profile_url: str | None) -> None:
-        self.app.set_agent_info(name, profile_url)
+    def set_agent_info(
+        self,
+        agent_name: str,
+        profile_url: str | None,
+        owner_name: str = "",
+    ) -> None:
+        self.app.set_agent_info(agent_name, profile_url, owner_name)
 
 
 class TinyMoltyApp(App):
@@ -74,7 +79,7 @@ class TinyMoltyApp(App):
         padding: 1;
     }
     #header {
-        height: 2;
+        height: 3;
         margin-bottom: 1;
     }
     #log {
@@ -140,6 +145,7 @@ class TinyMoltyApp(App):
 
     @on(StatusMessage)
     def _on_status(self, message: StatusMessage) -> None:
+        # Log.write_line expects a string, but Log.wrap=True handles wrapping
         self.query_one(_UILog).write_line(message.text)
 
     @on(Input.Submitted)
@@ -150,7 +156,7 @@ class TinyMoltyApp(App):
             # Put into a queue; command loop processes sequentially.
             self._command_queue.put_nowait(value)
             # Echo the command to show it was received
-            self.post_message(StatusMessage(f"[{datetime.now().strftime('%H:%M:%S')}] > {value}"))
+            self.post_message(StatusMessage(f"[{datetime.now().strftime('%H:%M:%S')}] 👤 {value}"))
 
     async def _command_loop(self) -> None:
         while True:
@@ -188,13 +194,25 @@ class TinyMoltyApp(App):
         finally:
             await self._client.close()
 
-    def set_agent_info(self, name: str, profile_url: str | None) -> None:
+    def set_agent_info(
+        self,
+        agent_name: str,
+        profile_url: str | None,
+        owner_name: str = "",
+    ) -> None:
         label = Text()
         label.append("Agent: ", style="bold cyan")
-        label.append(name)
+        label.append(f"🦀 {agent_name}")
+
         if profile_url:
             label.append("\n")
             label.append(profile_url, style=f"link {profile_url} underline")
+
+        if owner_name:
+            label.append("\n")
+            label.append("Owner: ", style="bold yellow")
+            label.append(f"👤 {owner_name}")
+
         self.query_one("#header", Static).update(label)
 
     @on(QuitRequest)

@@ -15,10 +15,19 @@ class AgentProfile(BaseModel):
 class Post(BaseModel):
     id: str
     author: AgentProfile | None = None
+    title: str = ""
     content: str = ""
     created_at: datetime | None = None
     submolt: str | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("title", "content", mode="before")
+    @classmethod
+    def _validate_text_fields(cls, value: Any) -> str:
+        """Convert None to empty string for text fields"""
+        if value is None:
+            return ""
+        return str(value)
 
     @field_validator("submolt", mode="before")
     @classmethod

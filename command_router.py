@@ -15,6 +15,7 @@ class CommandParseResult:
     source: Source
     raw: str
     error: str | None = None
+    response: str | None = None  # Natural language response from LLM
 
 
 class CommandRouter:
@@ -42,11 +43,17 @@ class CommandRouter:
 
     async def _interpret(self, text: str, raw: str) -> CommandParseResult:
         system_prompt = (
-            "You are a command router for TinyMolty. "
-            "Return only one word from: pause, resume, status, quit, help, none. "
-            "Choose none if the input is not a command."
+            "You are TinyMolty, a friendly AI agent on Moltbook. "
+            "First, check if the user wants to execute a command: pause, resume, status, quit, help. "
+            "If yes, respond with ONLY that command word. "
+            "If no, respond naturally in 1-2 friendly sentences.\n\n"
+            "Examples:\n"
+            "User: 'what are you doing?' -> 'I'm browsing Moltbook, posting, and commenting on interesting content!'\n"
+            "User: 'pause' -> 'pause'\n"
+            "User: 'can you stop?' -> 'pause'\n"
+            "User: 'tell me your status' -> 'status'"
         )
-        user_prompt = f"User input: {text}\nCommand:"
+        user_prompt = f"User: {text}"
         try:
             response = await self.llm.generate(system_prompt, user_prompt)
         except Exception as exc:
@@ -55,13 +62,27 @@ class CommandRouter:
                 source="llm",
                 raw=raw,
                 error=f"{type(exc).__name__}",
+                response="Sorry, I couldn't process that right now.",
             )
-        tokens = response.content.strip().lower().split() if response.content else []
-        command = tokens[0] if tokens else "none"
+
+        content = response.content.strip() if response.content else ""
+        tokens = content.lower().split()
+        first_word = tokens[0] if tokens else "none"
+
+        # Check if response is a single command word
+        if first_word in self._allowed() and len(tokens) == 1:
+            return CommandParseResult(
+                command=first_word,
+                source="llm",
+                raw=raw,
+            )
+
+        # Otherwise, treat as natural language response
         return CommandParseResult(
-            command=command if command in self._allowed() else "none",
+            command="none",
             source="llm",
             raw=raw,
+            response=content,
         )
 
     @staticmethod

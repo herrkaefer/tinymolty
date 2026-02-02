@@ -57,26 +57,30 @@ class BotEngine:
             agent_data = response.get("agent", {})
 
             agent_name = agent_data.get("name", "Unknown")
-            agent_username = agent_data.get("username")
             is_claimed = agent_data.get("is_claimed", False)
             karma = agent_data.get("karma", 0)
             stats = agent_data.get("stats", {})
-            profile_name = self.config.bot.name or agent_username
-            profile_url = f"https://www.moltbook.com/u/{profile_name}" if profile_name else None
+
+            # Get owner info (use camelCase field names)
+            owner = agent_data.get("owner", {})
+            owner_name = owner.get("xName") or owner.get("xHandle", "")
+
+            profile_url = f"https://www.moltbook.com/u/{agent_name}"
 
             if hasattr(self.ui, "set_agent_info"):
                 try:
-                    self.ui.set_agent_info(agent_name, profile_url)
+                    self.ui.set_agent_info(
+                        agent_name=agent_name,
+                        profile_url=profile_url,
+                        owner_name=owner_name,
+                    )
                 except Exception:
                     pass
 
-            await self.ui.send_status(f"👤 Logged in as: {agent_name}")
+            await self.ui.send_status(f"🦀 Logged in as: {agent_name}")
             await self.ui.send_status(f"   Karma: {karma} | Posts: {stats.get('posts', 0)} | Comments: {stats.get('comments', 0)}")
 
             if is_claimed:
-                claimed_at = agent_data.get("claimed_at", "")
-                owner = agent_data.get("owner", {})
-                owner_name = owner.get("xName") or owner.get("xHandle", "")
                 if owner_name:
                     await self.ui.send_status(f"✅ Account claimed by: {owner_name}")
                 else:
@@ -95,18 +99,6 @@ class BotEngine:
             else:
                 await self.ui.send_status(f"⚠️  Could not verify account: {type(e).__name__}: {error_msg[:80]}")
             await self.ui.send_status(f"   Continuing anyway - browse should work with valid API key")
-
-        await self.ui.send_status("🔄 Engine loop started. Use /status /pause /resume /quit for control.")
-
-        # Show initial scheduler state
-        next_actions = []
-        for action in ["browse", "post", "comment", "heartbeat"]:
-            wait = self.scheduler.next_available_in(action)
-            if wait > 0:
-                next_actions.append(f"{action}={int(wait)}s")
-            else:
-                next_actions.append(f"{action}=ready")
-        await self.ui.send_status(f"   Initial state: {', '.join(next_actions)}")
 
         while self._running:
             if self._paused:
@@ -138,15 +130,22 @@ class BotEngine:
             await self.ui.send_status("⚠️ Empty command ignored.")
             return
         if not text.startswith("/"):
-            await self.ui.send_status("🤖 Interpreting command...")
+            await self.ui.send_status("🦀 Interpreting...")
         result = await self._command_router.parse(text)
         if result.error:
             await self.ui.send_status(f"⚠️ Command parsing failed: {result.error}")
+            if result.response:
+                await self.ui.send_status(f"🦀 {result.response}")
+            return
         if result.command == "none":
-            await self.ui.send_status(f"❓ Unrecognized command: \"{text}\"")
+            # Natural language response from LLM
+            if result.response:
+                await self.ui.send_status(f"🦀 {result.response}")
+            else:
+                await self.ui.send_status(f"❓ I didn't understand: \"{text}\"")
             return
         if result.source == "llm":
-            await self.ui.send_status(f"🤖 Interpreted as /{result.command}")
+            await self.ui.send_status(f"🦀 Interpreted as /{result.command}")
         await self._run_command(result.command, raw=text)
 
     async def _run_command(self, command: str, raw: str) -> None:
@@ -271,7 +270,8 @@ class BotEngine:
         interacted = False
         for post in posts:
             post_url = f"https://www.moltbook.com/post/{post.id}"
-            post_preview = post.content[:50] + "..." if len(post.content) > 50 else post.content
+            # Use full title if available, otherwise use content preview
+            post_title = post.title if post.title else (post.content[:50] + "..." if len(post.content) > 50 else post.content)
 
             if self.scheduler.can_do("comment"):
                 try:
@@ -279,7 +279,8 @@ class BotEngine:
                     comment = await self._generate_comment(post)
                     await self.client.comment(post.id, comment)
                     self.scheduler.record_action("comment")
-                    await self.ui.send_status(f"💬 Commented: \"{post_preview}\" - {post_url}")
+                    # Show both the comment content and the post title
+                    await self.ui.send_status(f"💬 Commented: \"{comment}\"\n   on: \"{post_title}\"\n   {post_url}")
                     interacted = True
                 except Exception as e:
                     error_msg = str(e)
@@ -292,7 +293,8 @@ class BotEngine:
                 try:
                     await self.client.upvote(post.id)
                     self.scheduler.record_action("upvote")
-                    await self.ui.send_status(f"👍 Upvoted: \"{post_preview}\" - {post_url}")
+                    # Show full title (no truncation needed for upvote)
+                    await self.ui.send_status(f"👍 Upvoted: \"{post_title}\"\n   {post_url}")
                     interacted = True
                 except Exception as e:
                     await self.ui.send_status(f"❌ Upvote failed: {type(e).__name__}: {str(e)}")
@@ -302,7 +304,8 @@ class BotEngine:
                     agent_url = f"https://www.moltbook.com/agents/{post.author.id}"
                     await self.client.follow(post.author.id)
                     self.scheduler.record_action("follow")
-                    await self.ui.send_status(f"➕ Following {post.author.username}: {agent_url}")
+                    # Put URL on separate line to prevent truncation
+                    await self.ui.send_status(f"➕ Following {post.author.username}\n   {agent_url}")
                     interacted = True
                 except Exception as e:
                     await self.ui.send_status(f"❌ Follow failed: {type(e).__name__}: {str(e)}")
@@ -337,7 +340,8 @@ class BotEngine:
 
             post_url = f"https://www.moltbook.com/post/{response.id}"
             content_preview = content[:60] + "..." if len(content) > 60 else content
-            await self.ui.send_status(f"📝 Posted: \"{content_preview}\" - {post_url}")
+            # Put URL on separate line to prevent truncation
+            await self.ui.send_status(f"📝 Posted: \"{content_preview}\"\n   {post_url}")
             self._post_failures = 0
         except httpx.ReadTimeout:
             await self._handle_post_failure("ReadTimeout")
