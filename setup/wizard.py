@@ -13,7 +13,6 @@ from config import (
     MoltbookConfig,
     PersonalityConfig,
     TelegramConfig,
-    UIConfig,
     BehaviorConfig,
     ensure_config_permissions,
     save_config,
@@ -27,23 +26,6 @@ def print_section(title: str):
     print("-" * 60)
     print(f"  {title}")
     print("-" * 60)
-
-
-def get_ui_mode() -> str:
-    """Get UI mode from user"""
-    print_section("UI Mode")
-    print("How do you want to interact with TinyMolty?")
-    print("  1. Terminal (run in your terminal)")
-    print("  2. Telegram (receive updates via Telegram)")
-    print()
-
-    while True:
-        choice = input("Enter choice (1 or 2) [1]: ").strip() or "1"
-        if choice == "1":
-            return "terminal"
-        elif choice == "2":
-            return "telegram"
-        print("Invalid choice. Please enter 1 or 2.")
 
 
 def get_bot_config(default_name: str = "CuriousMolty", default_desc: str = "A curious AI agent exploring moltbook") -> BotConfig:
@@ -164,16 +146,12 @@ def get_llm_config() -> LLMConfig:
     )
 
 
-def get_telegram_config(ui_mode: str) -> TelegramConfig:
+def get_telegram_config() -> TelegramConfig:
     """Get Telegram configuration from user"""
     print_section("Telegram Configuration")
 
-    if ui_mode == "terminal":
-        print("Enable Telegram notifications? (optional)")
-        enable = input("Enable Telegram? (y/n) [n]: ").strip().lower() == 'y'
-    else:
-        print("Telegram is required for Telegram UI mode.")
-        enable = True
+    print("Enable Telegram notifications? (optional)")
+    enable = input("Enable Telegram? (y/n) [n]: ").strip().lower() == 'y'
 
     if not enable:
         return TelegramConfig(enabled=False, bot_token="keyring", chat_id="")
@@ -241,17 +219,15 @@ def run_configuration_wizard(
             pass
 
     # Collect configuration
-    ui_mode = get_ui_mode()
     bot_config = get_bot_config(default_name=default_name, default_desc=default_desc)
     personality_config = get_personality_config()
     llm_config = get_llm_config()
     moltbook_config = get_moltbook_config()
-    telegram_config = get_telegram_config(ui_mode)
+    telegram_config = get_telegram_config()
 
     # Create config
     config = AppConfig(
         bot=bot_config,
-        ui=UIConfig(mode=ui_mode),
         personality=personality_config,
         llm=llm_config,
         moltbook=moltbook_config,
@@ -265,7 +241,6 @@ def run_configuration_wizard(
     print("  Configuration Summary")
     print("=" * 60)
     print(f"Bot Name: {config.bot.name}")
-    print(f"UI Mode: {config.ui.mode}")
     print(f"LLM Provider: {config.llm.provider}")
     print(f"LLM Model: {config.llm.model}")
     print(f"Topics: {', '.join(config.personality.topics_of_interest)}")

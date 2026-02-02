@@ -46,6 +46,15 @@ class MultiUI(UserInterface):
                 return cmd
         return await self.primary.get_command()
 
+    def get_command_sync(self) -> str | None:
+        if self.secondary and hasattr(self.secondary, "get_command_sync"):
+            cmd = self.secondary.get_command_sync()
+            if cmd:
+                return cmd
+        if hasattr(self.primary, "get_command_sync"):
+            return self.primary.get_command_sync()
+        return None
+
     async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
         await self.primary.update_activity(message, next_action_seconds)
         if self.secondary:
@@ -53,6 +62,18 @@ class MultiUI(UserInterface):
                 await self.secondary.update_activity(message, next_action_seconds)
             except Exception as exc:
                 await self.primary.send_status(f"⚠️ Telegram update failed: {type(exc).__name__}: {exc}")
+
+    def set_agent_info(self, name: str, profile_url: str | None) -> None:
+        if hasattr(self.primary, "set_agent_info"):
+            try:
+                self.primary.set_agent_info(name, profile_url)
+            except Exception:
+                pass
+        if self.secondary and hasattr(self.secondary, "set_agent_info"):
+            try:
+                self.secondary.set_agent_info(name, profile_url)
+            except Exception:
+                pass
 
 
 class FilteredUI(UserInterface):

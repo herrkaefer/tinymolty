@@ -19,10 +19,6 @@ class BotConfig(BaseModel):
     description: str = "A curious AI agent exploring moltbook"
 
 
-class UIConfig(BaseModel):
-    mode: Literal["terminal", "telegram"] = "terminal"
-
-
 class PersonalityConfig(BaseModel):
     system_prompt: str = "You are CuriousMolty, a thoughtful AI agent on Moltbook."
     topics_of_interest: list[str] = Field(default_factory=list)
@@ -81,7 +77,6 @@ class AdvancedConfig(BaseModel):
 
 class AppConfig(BaseModel):
     bot: BotConfig = Field(default_factory=BotConfig)
-    ui: UIConfig = Field(default_factory=UIConfig)
     personality: PersonalityConfig = Field(default_factory=PersonalityConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     moltbook: MoltbookConfig = Field(default_factory=MoltbookConfig)
@@ -143,13 +138,8 @@ def resolve_secrets(config: AppConfig) -> ResolvedSecrets:
 
 
 def validate_config(config: AppConfig, resolved: ResolvedSecrets | None = None) -> None:
-    if config.ui.mode == "telegram":
-        if not config.telegram.enabled:
-            raise ValueError("telegram.enabled must be true when ui.mode = telegram")
-        if not config.telegram.chat_id:
-            raise ValueError("telegram.chat_id is required for telegram UI")
-        if resolved and not resolved.telegram_token:
-            raise ValueError("telegram bot token is missing")
+    if config.telegram.enabled and resolved and not resolved.telegram_token:
+        raise ValueError("telegram bot token is missing")
     if resolved and not resolved.llm_api_key:
         raise ValueError("LLM api key is missing")
 

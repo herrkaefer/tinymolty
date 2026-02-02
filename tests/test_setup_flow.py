@@ -12,7 +12,6 @@ from config import (
     MoltbookConfig,
     PersonalityConfig,
     TelegramConfig,
-    UIConfig,
     BehaviorConfig,
     AdvancedConfig,
     save_config,
@@ -30,7 +29,6 @@ def test_config_creation():
     print(f"✓ Bot 名称: {config.bot.name}")
     print(f"✓ LLM 提供商: {config.llm.provider}")
     print(f"✓ LLM 模型: {config.llm.model}")
-    print(f"✓ UI 模式: {config.ui.mode}")
     print("✓ 默认配置创建成功")
 
 
@@ -43,7 +41,6 @@ def test_config_save_and_load():
         # 创建自定义配置
         config = AppConfig(
             bot=BotConfig(name="TestBot", description="Test bot for configuration"),
-            ui=UIConfig(mode="terminal"),
             personality=PersonalityConfig(
                 system_prompt="You are a test bot",
                 topics_of_interest=["testing", "automation", "AI"]
@@ -130,25 +127,19 @@ def test_config_validation():
     print("\n=== 测试 4: 配置验证 ===")
 
     # 测试有效的 terminal 模式配置
-    config = AppConfig(
-        ui=UIConfig(mode="terminal"),
-        llm=LLMConfig(api_key="test-key")
-    )
+    config = AppConfig(llm=LLMConfig(api_key="test-key"))
     secrets = resolve_secrets(config)
     try:
         validate_config(config, secrets)
-        print("✓ Terminal 模式配置验证通过")
+        print("✓ 基础配置验证通过")
     except ValueError as e:
         print(f"✗ 验证失败: {e}")
         raise
 
-    # 测试无效的 telegram 模式配置 (enabled=False 但 mode=telegram)
-    config = AppConfig(
-        ui=UIConfig(mode="telegram"),
-        telegram=TelegramConfig(enabled=False)
-    )
+    # 测试无效的 telegram 配置 (enabled=True 但缺少 token)
+    config = AppConfig(telegram=TelegramConfig(enabled=True, bot_token=""))
     try:
-        validate_config(config)
+        validate_config(config, resolve_secrets(config))
         print("✗ 应该抛出验证错误")
         assert False, "应该抛出 ValueError"
     except ValueError as e:
@@ -168,7 +159,6 @@ def test_complete_setup_flow():
                 name="TinyMolty测试",
                 description="一个测试用的 Moltbook 机器人"
             ),
-            ui=UIConfig(mode="terminal"),
             personality=PersonalityConfig(
                 system_prompt="你是一个友好的 AI 助手，热爱技术交流",
                 topics_of_interest=["Python", "AI", "开源软件"]
@@ -227,7 +217,6 @@ def test_complete_setup_flow():
         print("\n配置摘要:")
         print(f"  Bot 名称: {loaded_config.bot.name}")
         print(f"  描述: {loaded_config.bot.description}")
-        print(f"  UI 模式: {loaded_config.ui.mode}")
         print(f"  LLM 提供商: {loaded_config.llm.provider}")
         print(f"  LLM 模型: {loaded_config.llm.model}")
         print(f"  温度: {loaded_config.llm.temperature}")

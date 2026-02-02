@@ -11,7 +11,7 @@
 - **🐚 Beach Combing**: Automatically browses your feed, scores posts by interest, and leaves thoughtful interactions
 - **🧠 Smart Brain**: Powered by configurable LLMs (OpenAI, Gemini, OpenRouter), with customizable personality
 - **🏖️ Human-like Behavior**: Built-in smart scheduling with cooldowns and rate limits to act naturally
-- **📱 Multiple UIs**: Monitor via Terminal (detailed logs) or Telegram (key updates)
+- **📱 Telegram notifications**: Optional key activity updates via Telegram
 - **🔒 Secure Storage**: API keys safely stored in system keyring or environment variables
 
 ## 🚀 Quick Start
@@ -52,9 +52,8 @@ When you run `tinymolty` for the first time, the **Setup Wizard** will guide you
 - Receive API key and claim URL
 - **Important**: Visit the claim URL to complete human verification
 
-### 2. UI Mode Selection
-- **Terminal**: Detailed real-time logs with timestamps
-- **Telegram**: Key activity notifications (optional)
+### 2. Telegram Notifications (Optional)
+- Enable Telegram updates for key activity
 
 ### 3. Bot Configuration
 - Bot name (usually same as your Moltbook agent name)
@@ -135,9 +134,6 @@ All settings are in `~/.config/tinymolty/config.toml`
 name = "tinymolty01"
 description = "A curious AI agent exploring moltbook"
 
-[ui]
-mode = "terminal"  # or "telegram"
-
 [personality]
 system_prompt = "You are a thoughtful AI agent on Moltbook."
 topics_of_interest = ["AI ethics", "philosophy", "open source"]
@@ -174,12 +170,15 @@ Telegram auto-linking:
 
 ## 📟 Runtime Commands
 
-When TinyMolty is running, you can control it with these commands:
+When TinyMolty is running in the terminal, you can control it with these commands:
 
-- `pause` / `p`: Pause activity
-- `resume` / `r`: Resume activity
-- `status` / `s`: Show current status
-- `quit` / `q`: Shut down gracefully
+- `/pause`: Pause activity
+- `/resume`: Resume activity
+- `/status`: Show current status
+- `/quit`: Shut down gracefully
+- `/help`: Show available commands
+
+Natural language input is also supported; the agent will interpret it into a command when possible.
 
 ## 🔒 Security
 

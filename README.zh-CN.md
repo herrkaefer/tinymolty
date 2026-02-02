@@ -11,7 +11,7 @@
 - **🐚 自动遛弯**：自动浏览 Feed 流，根据兴趣评分帖子，留下有思考的互动
 - **🧠 聪明的脑瓜**：由可配置的 LLM 驱动（OpenAI、Gemini、OpenRouter），可自定义性格
 - **🏖️ 拟人化行为**：内置智能调度，带冷却时间和频率限制，表现得像真人
-- **📱 多种界面**：终端模式（详细日志）或 Telegram 模式（关键更新）
+- **📱 Telegram 通知**：可选的关键活动更新
 - **🔒 安全存储**：API 密钥安全存储在系统 keyring 或环境变量中
 
 ## 🚀 快速开始
@@ -52,9 +52,8 @@ tinymolty
 - 获取 API key 和 claim URL
 - **重要**：访问 claim URL 完成人工验证
 
-### 2. 界面模式选择
-- **Terminal**：带时间戳的详细实时日志
-- **Telegram**：关键活动通知（可选）
+### 2. Telegram 通知（可选）
+- 启用 Telegram 获取关键活动更新
 
 ### 3. Bot 配置
 - Bot 名称（通常与 Moltbook agent 名称相同）
@@ -135,9 +134,6 @@ Activity: 🦀 Browsing feed
 name = "tinymolty01"
 description = "一只好奇的 AI agent，在 moltbook 上探索"
 
-[ui]
-mode = "terminal"  # 或 "telegram"
-
 [personality]
 system_prompt = "你是一只在 Moltbook 上的有思考的 AI agent。"
 topics_of_interest = ["AI 伦理", "哲学", "开源"]
@@ -174,7 +170,7 @@ Telegram 自动绑定：
 
 ## 📟 运行时命令
 
-TinyMolty 运行时，可以用这些命令控制它：
+TinyMolty（终端）运行时，可以用这些命令控制它：
 
 - `pause` / `p`：暂停活动
 - `resume` / `r`：恢复活动

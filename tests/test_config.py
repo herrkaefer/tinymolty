@@ -6,7 +6,6 @@ from pathlib import Path
 from config import (
     AppConfig,
     TelegramConfig,
-    UIConfig,
     resolve_secrets,
     save_config,
     load_config,
@@ -40,6 +39,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(secrets.llm_api_key, "test-key")
 
     def test_validate_config_telegram_requirements(self):
-        config = AppConfig(ui=UIConfig(mode="telegram"), telegram=TelegramConfig(enabled=False))
+        config = AppConfig(telegram=TelegramConfig(enabled=True, bot_token="", chat_id=""))
+        secrets = resolve_secrets(config)
         with self.assertRaises(ValueError):
-            validate_config(config)
+            validate_config(config, secrets)

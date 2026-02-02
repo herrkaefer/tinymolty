@@ -10,7 +10,6 @@ from config import (
     BotConfig,
     LLMConfig,
     TelegramConfig,
-    UIConfig,
     save_config,
     load_config,
     resolve_secrets,
@@ -24,7 +23,6 @@ def test_telegram_disabled():
     print("\n=== 测试 1: Telegram 禁用配置 ===")
 
     config = AppConfig(
-        ui=UIConfig(mode="terminal"),
         telegram=TelegramConfig(
             enabled=False,
             bot_token="",
@@ -38,7 +36,7 @@ def test_telegram_disabled():
     # 验证配置
     try:
         validate_config(config, secrets)
-        print("✓ Terminal 模式 + Telegram 禁用 - 验证通过")
+        print("✓ Telegram 禁用 - 验证通过")
     except ValueError as e:
         print(f"✗ 验证失败: {e}")
         raise
@@ -48,12 +46,11 @@ def test_telegram_disabled():
     print("✓ Telegram token 正确为 None")
 
 
-def test_telegram_enabled_with_terminal_ui():
-    """测试 Telegram 启用但 UI 模式为 Terminal"""
-    print("\n=== 测试 2: Telegram 启用 + Terminal UI 模式 ===")
+def test_telegram_enabled_valid():
+    """测试 Telegram 启用配置"""
+    print("\n=== 测试 2: Telegram 启用 ===")
 
     config = AppConfig(
-        ui=UIConfig(mode="terminal"),
         telegram=TelegramConfig(
             enabled=True,
             bot_token="test-token-123",
@@ -64,69 +61,18 @@ def test_telegram_enabled_with_terminal_ui():
 
     secrets = resolve_secrets(config)
 
-    # 这种配置应该是有效的（Telegram 可以作为通知渠道，即使 UI 是 terminal）
     try:
         validate_config(config, secrets)
-        print("✓ Terminal UI + Telegram 启用 - 验证通过")
-        print("  (Telegram 可以作为通知渠道)")
+        print("✓ Telegram 启用 - 验证通过")
     except ValueError as e:
         print(f"✓ 验证结果: {e}")
 
 
-def test_telegram_ui_mode_without_enabled():
-    """测试 UI 模式为 Telegram 但 enabled=False"""
-    print("\n=== 测试 3: Telegram UI 模式但未启用 ===")
+def test_telegram_enabled_without_token():
+    """测试 Telegram 启用但缺少 bot token"""
+    print("\n=== 测试 3: Telegram 启用但缺少 bot token ===")
 
     config = AppConfig(
-        ui=UIConfig(mode="telegram"),
-        telegram=TelegramConfig(
-            enabled=False,
-            bot_token="test-token",
-            chat_id="123456789"
-        ),
-        llm=LLMConfig(api_key="test-key")
-    )
-
-    # 这应该失败
-    try:
-        validate_config(config)
-        print("✗ 应该抛出验证错误")
-        assert False, "期望 ValueError"
-    except ValueError as e:
-        print(f"✓ 正确捕获错误: {e}")
-
-
-def test_telegram_ui_mode_without_chat_id():
-    """测试 Telegram UI 模式但缺少 chat_id"""
-    print("\n=== 测试 4: Telegram UI 模式但缺少 chat_id ===")
-
-    config = AppConfig(
-        ui=UIConfig(mode="telegram"),
-        telegram=TelegramConfig(
-            enabled=True,
-            bot_token="test-token",
-            chat_id=""
-        ),
-        llm=LLMConfig(api_key="test-key")
-    )
-
-    secrets = resolve_secrets(config)
-
-    # 缺少 chat_id 应该失败
-    try:
-        validate_config(config, secrets)
-        print("✗ 应该抛出验证错误")
-        assert False, "期望 ValueError"
-    except ValueError as e:
-        print(f"✓ 正确捕获错误: {e}")
-
-
-def test_telegram_ui_mode_without_token():
-    """测试 Telegram UI 模式但缺少 bot token"""
-    print("\n=== 测试 5: Telegram UI 模式但缺少 bot token ===")
-
-    config = AppConfig(
-        ui=UIConfig(mode="telegram"),
         telegram=TelegramConfig(
             enabled=True,
             bot_token="",
@@ -146,12 +92,11 @@ def test_telegram_ui_mode_without_token():
         print(f"✓ 正确捕获错误: {e}")
 
 
-def test_telegram_ui_mode_valid():
-    """测试完整有效的 Telegram UI 模式配置"""
-    print("\n=== 测试 6: 完整有效的 Telegram UI 模式 ===")
+def test_telegram_enabled_full_config():
+    """测试完整有效的 Telegram 配置"""
+    print("\n=== 测试 4: 完整有效的 Telegram 配置 ===")
 
     config = AppConfig(
-        ui=UIConfig(mode="telegram"),
         telegram=TelegramConfig(
             enabled=True,
             bot_token="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz",
@@ -164,7 +109,7 @@ def test_telegram_ui_mode_valid():
 
     try:
         validate_config(config, secrets)
-        print("✓ 完整的 Telegram UI 配置验证通过")
+        print("✓ 完整的 Telegram 配置验证通过")
         print(f"  Bot Token: {secrets.telegram_token[:20]}...")
         print(f"  Chat ID: {config.telegram.chat_id}")
     except ValueError as e:
@@ -228,7 +173,6 @@ def test_telegram_config_save_load():
         # 创建 Telegram 配置
         config = AppConfig(
             bot=BotConfig(name="TelegramBot"),
-            ui=UIConfig(mode="telegram"),
             telegram=TelegramConfig(
                 enabled=True,
                 bot_token="5555555555:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw",
@@ -253,7 +197,6 @@ def test_telegram_config_save_load():
         print("\n✓ 配置已加载")
 
         # 验证配置
-        assert loaded.ui.mode == "telegram"
         assert loaded.telegram.enabled == True
         assert loaded.telegram.chat_id == "123456789"
         assert loaded.telegram.bot_token == "5555555555:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
@@ -277,7 +220,6 @@ def test_telegram_chat_id_formats():
 
     for chat_id, description in test_cases:
         config = AppConfig(
-            ui=UIConfig(mode="telegram"),
             telegram=TelegramConfig(
                 enabled=True,
                 bot_token="test-token",
@@ -333,7 +275,6 @@ def test_complete_telegram_setup():
                 name="TelegramMolty",
                 description="运行在 Telegram 上的 Moltbook 机器人"
             ),
-            ui=UIConfig(mode="telegram"),
             personality={
                 "system_prompt": "你是一个友好的 Telegram 机器人助手",
                 "topics_of_interest": ["Telegram", "Automation", "AI"]
@@ -370,7 +311,6 @@ def test_complete_telegram_setup():
 
         print("\n配置摘要:")
         print(f"  Bot 名称: {loaded.bot.name}")
-        print(f"  UI 模式: {loaded.ui.mode}")
         print(f"  Telegram 启用: {loaded.telegram.enabled}")
         print(f"  Telegram Chat ID: {loaded.telegram.chat_id}")
         print(f"  LLM 提供商: {loaded.llm.provider}")
@@ -385,11 +325,9 @@ def main():
 
     try:
         test_telegram_disabled()
-        test_telegram_enabled_with_terminal_ui()
-        test_telegram_ui_mode_without_enabled()
-        test_telegram_ui_mode_without_chat_id()
-        test_telegram_ui_mode_without_token()
-        test_telegram_ui_mode_valid()
+        test_telegram_enabled_valid()
+        test_telegram_enabled_without_token()
+        test_telegram_enabled_full_config()
         test_telegram_token_storage_methods()
         test_telegram_config_save_load()
         test_telegram_chat_id_formats()

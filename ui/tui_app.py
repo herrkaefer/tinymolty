@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime
+
+from rich.text import Text
+from textual import on
+from textual.app import App, ComposeResult
+from textual.message import Message
+from textual.widgets import Input, Log, Static
+
+from bot_engine import BotEngine
+from config import AppConfig, ResolvedSecrets
+from llm.factory import build_provider
+from moltbook.client import MoltbookClient
+from scheduler import Scheduler
+
+
+class StatusMessage(Message):
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self.text = text
+
+
+class _UILog(Log):
+    can_focus = False
+    can_focus_children = False
+
+
+class _TextualUIAdapter:
+    """Minimal UI adapter used by BotEngine.
+
+    Best practice in Textual is to update UI via messages from background work.
+    """
+
+    def __init__(self, app: "TinyMoltyApp") -> None:
+        self.app = app
+
+    async def start(self) -> None:  # matches UserInterface shape
+        return
+
+    async def stop(self) -> None:  # matches UserInterface shape
+        return
+
+    async def send_status(self, message: str) -> None:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.app.post_message(StatusMessage(f"[{timestamp}] {message}"))
+
+    async def prompt(self, message: str) -> str:
+        # Not used in the runtime loop currently.
+        await self.send_status(message)
+        return ""
+
+    async def get_command(self) -> str | None:
+        # Commands are handled directly by the TUI, not pulled by the engine.
+        return None
+
+    async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
+        # For now we don't render activity in the header (keeps UI stable and uncluttered).
+        return
+
+    def set_agent_info(self, name: str, profile_url: str | None) -> None:
+        self.app.set_agent_info(name, profile_url)
+
+
+class TinyMoltyApp(App):
+    CSS = """
+    Screen {
+        padding: 1;
+    }
+    #header {
+        height: 2;
+        margin-bottom: 1;
+    }
+    #log {
+        height: 1fr;
+        border: solid $accent;
+    }
+    #command {
+        height: 3;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, config: AppConfig, secrets: ResolvedSecrets) -> None:
+        super().__init__()
+        self.config = config
+        self.secrets = secrets
+        self._engine: BotEngine | None = None
+        self._client: MoltbookClient | None = None
+        self._command_queue: asyncio.Queue[str] = asyncio.Queue()
+
+    def compose(self) -> ComposeResult:
+        yield Static("Agent: (loading...)", id="header")
+        yield _UILog(id="log")
+        yield Input(
+            placeholder="Type /pause /resume /status /quit /help or use natural language",
+            id="command",
+        )
+
+    async def on_mount(self) -> None:
+        self.query_one(Input).focus()
+        # Run bot loop and command handling as workers so the UI stays responsive.
+        # Note: exclusive workers cancel other workers in the same group; avoid for long-lived loops.
+        self.run_worker(self._run_engine(), name="engine", group="engine")
+        self.run_worker(self._command_loop(), name="commands", group="commands")
+
+    async def on_unmount(self) -> None:
+        if self._client:
+            await self._client.close()
+
+    @on(StatusMessage)
+    def _on_status(self, message: StatusMessage) -> None:
+        self.query_one(_UILog).write_line(message.text)
+
+    @on(Input.Submitted)
+    def _on_input_submitted(self, event: Input.Submitted) -> None:
+        value = event.value.strip()
+        event.input.clear()
+        if value:
+            # Put into a queue; command loop processes sequentially.
+            self._command_queue.put_nowait(value)
+
+    async def _command_loop(self) -> None:
+        while True:
+            cmd = await self._command_queue.get()
+            if self._engine is None:
+                self.post_message(StatusMessage(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Engine not ready"))
+                continue
+            # Never run slow command parsing in the input handler; keep it in a worker task.
+            await self._engine.handle_command(cmd)
+
+    async def _run_engine(self) -> None:
+        if not self.secrets.llm_api_key:
+            self.post_message(StatusMessage("❌ Missing LLM API key"))
+            return
+        ui = _TextualUIAdapter(self)
+        self._client = MoltbookClient(self.config.moltbook.credentials_path)
+        scheduler = Scheduler(self.config.behavior, self.config.advanced)
+        llm = build_provider(self.config.llm, self.secrets.llm_api_key)
+        self._engine = BotEngine(self.config, self._client, llm, scheduler, ui)
+        try:
+            await self._engine.run_loop()
+        finally:
+            await self._client.close()
+
+    def set_agent_info(self, name: str, profile_url: str | None) -> None:
+        label = Text()
+        label.append("Agent: ", style="bold cyan")
+        label.append(name)
+        if profile_url:
+            label.append("\n")
+            label.append(profile_url, style=f"link {profile_url} underline")
+        self.query_one("#header", Static).update(label)

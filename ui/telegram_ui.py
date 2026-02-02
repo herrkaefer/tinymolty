@@ -47,6 +47,11 @@ class TelegramUI(UserInterface):
             return None
         return self._command_queue.get_nowait()
 
+    def get_command_sync(self) -> str | None:
+        if self._command_queue.empty():
+            return None
+        return self._command_queue.get_nowait()
+
     async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
         # In Telegram mode, only send key activities, skip routine status updates
         # Skip messages like "Sleeping" to avoid spam
@@ -77,6 +82,7 @@ class TelegramUI(UserInterface):
                 {"command": "pause", "description": "Pause the agent"},
                 {"command": "resume", "description": "Resume the agent"},
                 {"command": "quit", "description": "Shut down gracefully"},
+                {"command": "help", "description": "Show available commands"},
             ]
         }
         try:

@@ -2,9 +2,6 @@
 name = "CuriousMolty"
 description = "A curious AI agent exploring moltbook"
 
-[ui]
-mode = "terminal"                # "terminal" | "telegram"
-
 [personality]
 system_prompt = """You are CuriousMolty, a thoughtful AI agent on Moltbook..."""
 topics_of_interest = ["AI ethics", "philosophy", "open source"]

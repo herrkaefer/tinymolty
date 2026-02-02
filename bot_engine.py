@@ -8,6 +8,7 @@ from typing import Iterable
 import httpx
 from email.utils import parsedate_to_datetime
 
+from command_router import CommandRouter
 from config import AppConfig
 from llm.base import LLMProvider
 from moltbook.client import MoltbookClient
@@ -30,13 +31,22 @@ class BotEngine:
         self.llm = llm
         self.scheduler = scheduler
         self.ui = ui
+        self._command_router = CommandRouter(self.llm)
         self._running = False
         self._paused = False
         self._post_failures = 0
+        self._command_task: asyncio.Task | None = None
 
     async def run(self) -> None:
         self._running = True
         await self.ui.start()
+        try:
+            await self.run_loop()
+        finally:
+            await self.ui.stop()
+
+    async def run_loop(self) -> None:
+        self._running = True
         await self.ui.send_status("🦀 TinyMolty started.")
 
         # Check account status
@@ -46,9 +56,18 @@ class BotEngine:
             agent_data = response.get("agent", {})
 
             agent_name = agent_data.get("name", "Unknown")
+            agent_username = agent_data.get("username")
             is_claimed = agent_data.get("is_claimed", False)
             karma = agent_data.get("karma", 0)
             stats = agent_data.get("stats", {})
+            profile_name = self.config.bot.name or agent_username
+            profile_url = f"https://www.moltbook.com/u/{profile_name}" if profile_name else None
+
+            if hasattr(self.ui, "set_agent_info"):
+                try:
+                    self.ui.set_agent_info(agent_name, profile_url)
+                except Exception:
+                    pass
 
             await self.ui.send_status(f"👤 Logged in as: {agent_name}")
             await self.ui.send_status(f"   Karma: {karma} | Posts: {stats.get('posts', 0)} | Comments: {stats.get('comments', 0)}")
@@ -76,22 +95,37 @@ class BotEngine:
                 await self.ui.send_status(f"⚠️  Could not verify account: {type(e).__name__}: {error_msg[:80]}")
             await self.ui.send_status(f"   Continuing anyway - browse should work with valid API key")
 
-        try:
-            while self._running:
-                await self._handle_commands()
-                if not self._running:
-                    break
-                if self._paused:
-                    await asyncio.sleep(1)
-                    continue
-                await self._tick()
-        finally:
-            await self.ui.stop()
+        while self._running:
+            if self._paused:
+                await asyncio.sleep(0.2)
+                continue
+            await self._tick()
 
     async def _handle_commands(self) -> None:
-        command = await self.ui.get_command()
-        if not command:
+        # Kept for compatibility with older call sites; command_pump is the primary mechanism.
+        raw = await self.ui.get_command()
+        if not raw:
             return
+        await self.handle_command(raw)
+
+    async def handle_command(self, raw: str) -> None:
+        text = raw.strip()
+        if not text:
+            await self.ui.send_status("⚠️ Empty command ignored.")
+            return
+        if not text.startswith("/"):
+            await self.ui.send_status("🤖 Interpreting command...")
+        result = await self._command_router.parse(text)
+        if result.error:
+            await self.ui.send_status(f"⚠️ Command parsing failed: {result.error}")
+        if result.command == "none":
+            await self.ui.send_status(f"❓ Unrecognized command: \"{text}\"")
+            return
+        if result.source == "llm":
+            await self.ui.send_status(f"🤖 Interpreted as /{result.command}")
+        await self._run_command(result.command, raw=text)
+
+    async def _run_command(self, command: str, raw: str) -> None:
         if command == "pause":
             self._paused = True
             await self.ui.send_status("⏸️  Paused.")
@@ -100,9 +134,13 @@ class BotEngine:
             await self.ui.send_status("▶️  Resumed.")
         elif command == "status":
             await self.ui.send_status("🦀 Running." if not self._paused else "⏸️  Paused.")
+        elif command == "help":
+            await self.ui.send_status("⌨️ Commands: /pause /resume /status /quit /help")
         elif command == "quit":
             self._running = False
             await self.ui.send_status("👋 Shutting down.")
+        else:
+            await self.ui.send_status(f"❓ Unknown command: {raw}")
 
     async def _tick(self) -> None:
         if not self._running:
@@ -118,7 +156,6 @@ class BotEngine:
                 self.scheduler.next_available_in("heartbeat"),
             ]
         )
-        await self.ui.update_activity("Sleeping", next_wait)
         if next_wait <= 0:
             return
         await self._sleep_interruptible(next_wait)
@@ -126,10 +163,11 @@ class BotEngine:
     async def _sleep_interruptible(self, base_seconds: float) -> None:
         remaining = base_seconds + self.scheduler.jitter()
         while remaining > 0 and self._running:
-            await self._handle_commands()
             if self._paused:
                 break
-            step = min(0.5, remaining)
+            # Avoid waking too frequently during long backoffs; keep commands responsive.
+            step = 0.5 if remaining < 30 else 2.0
+            step = min(step, remaining)
             await asyncio.sleep(step)
             remaining -= step
 
