@@ -88,6 +88,12 @@ class BotEngine:
             else:
                 await self.ui.send_status("⚠️  Account NOT claimed - please complete claim process!")
                 await self.ui.send_status("   Some actions (like posting) may fail until claimed.")
+
+            # Send Telegram start message
+            start_msg = f"🚀 TinyMolty started\n🦀 Agent: {agent_name}\n📊 Karma: {karma}"
+            if owner_name:
+                start_msg += f"\n👤 Owner: {owner_name}"
+            await self.ui.send_summary(start_msg)
         except Exception as e:
             error_msg = str(e)
             # Show detailed error but don't stop - browsing may still work
@@ -137,22 +143,31 @@ class BotEngine:
     async def handle_command(self, raw: str) -> None:
         text = raw.strip()
         if not text:
-            await self.ui.send_status("⚠️ Empty command ignored.")
+            msg = "⚠️ Empty command ignored."
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
             return
         if not text.startswith("/"):
             await self.ui.send_status("🦀 Interpreting...")
         result = await self._command_router.parse(text)
         if result.error:
-            await self.ui.send_status(f"⚠️ Command parsing failed: {result.error}")
+            error_msg = f"⚠️ Command parsing failed: {result.error}"
+            await self.ui.send_status(error_msg)
+            await self.ui.send_summary(error_msg)
             if result.response:
                 await self.ui.send_status(f"🦀 {result.response}")
+                await self.ui.send_summary(f"🦀 {result.response}")
             return
         if result.command == "none":
             # Natural language response from LLM
             if result.response:
                 await self.ui.send_status(f"🦀 {result.response}")
+                # Also send to Telegram
+                await self.ui.send_summary(f"🦀 {result.response}")
             else:
-                await self.ui.send_status(f"❓ I didn't understand: \"{text}\"")
+                msg = f"❓ I didn't understand: \"{text}\""
+                await self.ui.send_status(msg)
+                await self.ui.send_summary(msg)
             return
         if result.source == "llm":
             await self.ui.send_status(f"🦀 Interpreted as /{result.command}")
@@ -161,14 +176,18 @@ class BotEngine:
     async def _run_command(self, command: str, raw: str) -> None:
         if command == "pause":
             self._paused = True
-            await self.ui.send_status("⏸️  Paused.")
+            msg = "⏸️  Paused."
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
         elif command == "resume":
             self._paused = False
-            await self.ui.send_status("▶️  Resumed.")
+            msg = "▶️  Resumed."
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
         elif command == "status":
             state = "⏸️  Paused" if self._paused else "🦀 Running"
             await self.ui.send_status(f"{state}")
-            # Show next action times
+            # Show next action times (detailed, for terminal only)
             next_actions = []
             for action in ["browse", "post", "comment", "heartbeat"]:
                 wait = self.scheduler.next_available_in(action)
@@ -177,13 +196,21 @@ class BotEngine:
                 else:
                     next_actions.append(f"{action}=ready")
             await self.ui.send_status(f"   Next: {', '.join(next_actions)}")
+            # Send concise summary to Telegram
+            await self.ui.send_summary(f"{state}")
         elif command == "help":
-            await self.ui.send_status("⌨️ Commands: /pause /resume /status /quit /help")
+            msg = "⌨️ Commands: /pause /resume /status /quit /help"
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
         elif command == "quit":
             self._running = False
-            await self.ui.send_status("👋 Shutting down.")
+            msg = "👋 Shutting down."
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
         else:
-            await self.ui.send_status(f"❓ Unknown command: {raw}")
+            msg = f"❓ Unknown command: {raw}"
+            await self.ui.send_status(msg)
+            await self.ui.send_summary(msg)
 
     async def _tick(self) -> None:
         if not self._running:
@@ -229,8 +256,11 @@ class BotEngine:
             await self.client.heartbeat()
             self.scheduler.record_action("heartbeat")
             await self.ui.send_status("💓 Heartbeat sent successfully")
+            # No summary for heartbeat - too frequent
         except Exception as e:
-            await self.ui.send_status(f"❌ Heartbeat failed: {type(e).__name__}: {str(e)}")
+            error_msg = f"❌ Heartbeat failed: {type(e).__name__}: {str(e)}"
+            await self.ui.send_status(error_msg)
+            await self.ui.send_summary(error_msg)
 
     async def _maybe_browse(self) -> None:
         if not self.scheduler.can_do("browse"):
@@ -270,13 +300,55 @@ class BotEngine:
 
             if scored:
                 await self.ui.send_status(f"🎯 Found {len(scored)} interesting posts")
-                await self._maybe_interact(scored)
+                details = await self._maybe_interact(scored)
+                # Send summary to Telegram
+                await self._send_browse_summary(post_count, len(scored), details)
             else:
                 await self.ui.send_status(f"😴 No interesting posts found")
+                # Send summary to Telegram
+                await self.ui.send_summary(f"📭 Browsed {post_count} posts, none interesting")
         except Exception as e:
-            await self.ui.send_status(f"❌ Browse failed: {type(e).__name__}: {str(e)}")
+            error_msg = f"❌ Browse failed: {type(e).__name__}: {str(e)}"
+            await self.ui.send_status(error_msg)
+            await self.ui.send_summary(error_msg)
 
-    async def _maybe_interact(self, posts: list[Post]) -> None:
+    async def _send_browse_summary(self, total_posts: int, interesting_posts: int, details: dict) -> None:
+        """Send complete browse summary to Telegram with full interaction details"""
+        lines = [f"📬 Browsed {total_posts} posts, found {interesting_posts} interesting"]
+
+        # Add comment details
+        for comment_info in details.get("comments", []):
+            lines.append(f"\n💬 Commented: \"{comment_info['content']}\"")
+            lines.append(f"   on: \"{comment_info['post_title']}\"")
+            lines.append(f"   {comment_info['url']}")
+
+        # Add upvote details
+        for upvote_info in details.get("upvotes", []):
+            lines.append(f"\n👍 Upvoted: \"{upvote_info['post_title']}\"")
+            lines.append(f"   {upvote_info['url']}")
+
+        # Add follow details
+        for follow_info in details.get("follows", []):
+            lines.append(f"\n➕ Followed: {follow_info['username']}")
+            lines.append(f"   {follow_info['url']}")
+
+        # Add failures
+        for failure in details.get("failures", []):
+            lines.append(f"\n{failure}")
+
+        if not details.get("comments") and not details.get("upvotes") and not details.get("follows") and not details.get("failures"):
+            lines.append("\n(No interactions - cooldowns active)")
+
+        await self.ui.send_summary("".join(lines))
+
+    async def _maybe_interact(self, posts: list[Post]) -> dict:
+        """Interact with posts. Returns full interaction details"""
+        details = {
+            "comments": [],
+            "upvotes": [],
+            "follows": [],
+            "failures": []
+        }
         interacted = False
         for post in posts:
             post_url = f"https://www.moltbook.com/post/{post.id}"
@@ -291,13 +363,23 @@ class BotEngine:
                     self.scheduler.record_action("comment")
                     # Show both the comment content and the post title
                     await self.ui.send_status(f"💬 Commented: \"{comment}\"\n   on: \"{post_title}\"\n   {post_url}")
+                    # Collect full details for Telegram summary
+                    details["comments"].append({
+                        "content": comment,
+                        "post_title": post_title,
+                        "url": post_url
+                    })
                     interacted = True
                 except Exception as e:
                     error_msg = str(e)
                     if "403" in error_msg or "Forbidden" in error_msg:
-                        await self.ui.send_status(f"❌ Comment failed: 403 Forbidden - Account not verified")
+                        failure = "❌ Comment failed: 403 Forbidden - Account not verified"
+                        await self.ui.send_status(failure)
+                        details["failures"].append(failure)
                     else:
-                        await self.ui.send_status(f"❌ Comment failed: {type(e).__name__}: {error_msg}")
+                        failure = f"❌ Comment failed: {type(e).__name__}: {error_msg}"
+                        await self.ui.send_status(failure)
+                        details["failures"].append(failure)
 
             if self.scheduler.can_do("upvote"):
                 try:
@@ -305,9 +387,16 @@ class BotEngine:
                     self.scheduler.record_action("upvote")
                     # Show full title (no truncation needed for upvote)
                     await self.ui.send_status(f"👍 Upvoted: \"{post_title}\"\n   {post_url}")
+                    # Collect full details for Telegram summary
+                    details["upvotes"].append({
+                        "post_title": post_title,
+                        "url": post_url
+                    })
                     interacted = True
                 except Exception as e:
-                    await self.ui.send_status(f"❌ Upvote failed: {type(e).__name__}: {str(e)}")
+                    failure = f"❌ Upvote failed: {type(e).__name__}: {str(e)}"
+                    await self.ui.send_status(failure)
+                    details["failures"].append(failure)
 
             if self.scheduler.can_do("follow") and post.author:
                 try:
@@ -316,15 +405,23 @@ class BotEngine:
                     self.scheduler.record_action("follow")
                     # Put URL on separate line to prevent truncation
                     await self.ui.send_status(f"➕ Following {post.author.username}\n   {agent_url}")
+                    # Collect full details for Telegram summary
+                    details["follows"].append({
+                        "username": post.author.username,
+                        "url": agent_url
+                    })
                     interacted = True
                 except Exception as e:
-                    await self.ui.send_status(f"❌ Follow failed: {type(e).__name__}: {str(e)}")
+                    failure = f"❌ Follow failed: {type(e).__name__}: {str(e)}"
+                    await self.ui.send_status(failure)
+                    details["failures"].append(failure)
 
             if interacted:
                 break
 
         if not interacted:
             await self.ui.send_status(f"⏭️  Skipped interactions (cooldowns active)")
+        return details
 
     async def _maybe_post(self) -> None:
         if not self.scheduler.can_do("post"):
@@ -352,8 +449,12 @@ class BotEngine:
             content_preview = content[:60] + "..." if len(content) > 60 else content
             # Put URL on separate line to prevent truncation
             await self.ui.send_status(f"📝 Posted: \"{content_preview}\"\n   {post_url}")
+            # Send complete summary to Telegram with URL
+            await self.ui.send_summary(f"📝 Posted: \"{content_preview}\"\n{post_url}")
             self._post_failures = 0
         except httpx.ReadTimeout:
+            error_msg = "❌ Post failed: ReadTimeout"
+            await self.ui.send_summary(error_msg)
             await self._handle_post_failure("ReadTimeout")
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
@@ -361,19 +462,25 @@ class BotEngine:
                 retry_after = self._parse_retry_after(e.response.headers)
                 backoff = retry_after or self.config.behavior.post_cooldown_minutes * 60
                 self.scheduler.record_backoff("post", backoff)
-                await self.ui.send_status(
-                    f"❌ Post failed: 429 Too Many Requests - backing off for {backoff}s"
-                )
+                error_msg = f"❌ Post failed: 429 Too Many Requests - backing off for {backoff}s"
+                await self.ui.send_status(error_msg)
+                await self.ui.send_summary(error_msg)
             elif status == 403:
-                await self.ui.send_status("❌ Post failed: 403 Forbidden - Account may not be verified")
+                error_msg = "❌ Post failed: 403 Forbidden - Account may not be verified"
+                await self.ui.send_status(error_msg)
                 await self.ui.send_status("   Check your claim URL and complete human verification")
+                await self.ui.send_summary(error_msg)
                 await self._handle_post_failure("403 Forbidden")
             else:
-                await self.ui.send_status(f"❌ Post failed: HTTP {status} - {e.response.text[:200]}")
+                error_msg = f"❌ Post failed: HTTP {status} - {e.response.text[:200]}"
+                await self.ui.send_status(error_msg)
+                await self.ui.send_summary(f"❌ Post failed: HTTP {status}")
                 await self._handle_post_failure(f"HTTP {status}")
         except Exception as e:
             error_msg = str(e)
-            await self.ui.send_status(f"❌ Post failed: {type(e).__name__}: {error_msg}")
+            full_error_msg = f"❌ Post failed: {type(e).__name__}: {error_msg}"
+            await self.ui.send_status(full_error_msg)
+            await self.ui.send_summary(f"❌ Post failed: {type(e).__name__}")
             await self._handle_post_failure(type(e).__name__)
 
     async def _score_posts(self, posts: Iterable[Post]) -> list[Post]:

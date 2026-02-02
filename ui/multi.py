@@ -35,12 +35,16 @@ class MultiUI(UserInterface):
                 await self.primary.send_status(f"⚠️ Telegram stop failed: {type(exc).__name__}: {exc}")
 
     async def send_status(self, message: str) -> None:
+        """Send detailed status to primary UI only (terminal)"""
         await self.primary.send_status(message)
+
+    async def send_summary(self, message: str) -> None:
+        """Send summary only to secondary UI (e.g., Telegram)"""
         if self.secondary:
             try:
                 await self.secondary.send_status(message)
             except Exception as exc:
-                await self.primary.send_status(f"⚠️ Telegram send failed: {type(exc).__name__}: {exc}")
+                await self.primary.send_status(f"⚠️ Telegram summary failed: {type(exc).__name__}: {exc}")
 
     async def prompt(self, message: str) -> str:
         if self.secondary:
@@ -64,12 +68,8 @@ class MultiUI(UserInterface):
         return None
 
     async def update_activity(self, message: str, next_action_seconds: float | None = None) -> None:
+        """Send activity updates only to primary UI (terminal), not to Telegram"""
         await self.primary.update_activity(message, next_action_seconds)
-        if self.secondary:
-            try:
-                await self.secondary.update_activity(message, next_action_seconds)
-            except Exception as exc:
-                await self.primary.send_status(f"⚠️ Telegram update failed: {type(exc).__name__}: {exc}")
 
     def set_agent_info(self, agent_name: str, profile_url: str | None, owner_name: str = "") -> None:
         if hasattr(self.primary, "set_agent_info"):

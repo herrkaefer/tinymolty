@@ -14,7 +14,17 @@ class UserInterface(ABC):
 
     @abstractmethod
     async def send_status(self, message: str) -> None:
+        """Send detailed status message (to all UIs)"""
         raise NotImplementedError
+
+    async def send_summary(self, message: str) -> None:
+        """Send summary message (optional, for Telegram etc.)
+
+        Default implementation does nothing. Override in specific UIs if needed.
+        This is used to send concise summaries to Telegram while keeping
+        detailed logs in the terminal.
+        """
+        pass
 
     @abstractmethod
     async def prompt(self, message: str) -> str:
