@@ -32,11 +32,39 @@ async def test_api_calls():
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # Test browse posts (hot)
+        print("-" * 60)
+        print("1. Browsing hot posts...")
+        print("-" * 60)
+        print(f"URL: {base_url}/posts?sort=hot&limit=5")
+
+        try:
+            response = await client.get(
+                f"{base_url}/posts",
+                headers=headers,
+                params={"sort": "hot", "limit": 5},
+            )
+            print(f"Status: {response.status_code}")
+
+            if response.status_code == 200:
+                data = response.json()
+                posts = data.get("posts", [])
+                print(f"✓ Got {len(posts)} hot posts")
+            else:
+                print(f"✗ Browse hot posts failed: {response.text[:200]}")
+        except Exception as e:
+            print(f"✗ Error: {type(e).__name__}: {e}")
+            if hasattr(e, 'response'):
+                print(f"  Response: {e.response.text[:200]}")
+
+        print()
+
         # First, get a post ID from feed
         print("-" * 60)
-        print("1. Getting feed to find a post...")
+        print("2. Getting feed to find a post...")
         print("-" * 60)
 
+        author_identifier = None
         try:
             response = await client.get(f"{base_url}/feed", headers=headers)
             print(f"Status: {response.status_code}")
@@ -47,8 +75,23 @@ async def test_api_calls():
                 if posts:
                     post_id = posts[0].get("id")
                     post_content = posts[0].get("content", "")[:50]
+                    author_identifier = None
+                    author_info = posts[0].get("author")
+                    if isinstance(author_info, dict):
+                        author_identifier = (
+                            author_info.get("id")
+                            or author_info.get("agent_id")
+                            or author_info.get("username")
+                        )
+                    elif isinstance(author_info, str):
+                        author_identifier = author_info
+                    if not author_identifier:
+                        author_identifier = posts[0].get("author_id") or posts[0].get("agent_id")
                     print(f"✓ Got post ID: {post_id}")
                     print(f"  Content: {post_content}...")
+                    print(f"  Post URL: https://www.moltbook.com/post/{post_id}")
+                    if author_identifier:
+                        print(f"  Author: {author_identifier}")
                 else:
                     print("✗ No posts in feed")
                     return
@@ -63,7 +106,7 @@ async def test_api_calls():
 
         # Test create post
         print("-" * 60)
-        print("1.5 Testing create post...")
+        print("2.5 Testing create post...")
         print("-" * 60)
         print(f"URL: {base_url}/posts")
 
@@ -93,9 +136,9 @@ async def test_api_calls():
 
         # Test upvote
         print("-" * 60)
-        print("2. Testing upvote...")
+        print("3. Testing upvote...")
         print("-" * 60)
-        print(f"URL: {base_url}/posts/{post_id}/upvote")
+        print(f"Post URL: https://www.moltbook.com/post/{post_id}")
         print(f"Headers: {headers}")
 
         try:
@@ -119,9 +162,9 @@ async def test_api_calls():
 
         # Test comment
         print("-" * 60)
-        print("3. Testing comment...")
+        print("4. Testing comment...")
         print("-" * 60)
-        print(f"URL: {base_url}/posts/{post_id}/comments")
+        print(f"Post URL: https://www.moltbook.com/post/{post_id}")
 
         try:
             response = await client.post(
@@ -140,6 +183,36 @@ async def test_api_calls():
             print(f"✗ Error: {type(e).__name__}: {e}")
             if hasattr(e, 'response'):
                 print(f"  Response: {e.response.text[:200]}")
+
+        print()
+
+        # Test follow
+        print("-" * 60)
+        print("5. Testing follow...")
+        print("-" * 60)
+        if not author_identifier:
+            print("✗ No author identifier found to follow")
+        else:
+            print(f"URL: {base_url}/agents/{author_identifier}/follow")
+
+            try:
+                response = await client.post(
+                    f"{base_url}/agents/{author_identifier}/follow",
+                    headers=headers
+                )
+                print(f"Status: {response.status_code}")
+                print(f"Response: {response.text[:200]}")
+
+                if response.status_code in (200, 201):
+                    print("✓ Follow successful!")
+                else:
+                    print("✗ Follow failed")
+            except Exception as e:
+                print(f"✗ Error: {type(e).__name__}: {e}")
+                if hasattr(e, 'response'):
+                    print(f"  Response: {e.response.text[:200]}")
+
+        print()
 
     print()
     print("=" * 60)
