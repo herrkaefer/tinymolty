@@ -11,12 +11,20 @@ class MultiUI(UserInterface):
         self.secondary = secondary
 
     async def start(self) -> None:
+        import sys
+        print(f"[MultiUI] Starting primary UI...", file=sys.stderr, flush=True)
         await self.primary.start()
+        print(f"[MultiUI] Primary UI started", file=sys.stderr, flush=True)
         if self.secondary:
+            print(f"[MultiUI] Starting secondary UI (Telegram)...", file=sys.stderr, flush=True)
             try:
                 await self.secondary.start()
+                print(f"[MultiUI] Secondary UI started", file=sys.stderr, flush=True)
             except Exception as exc:
+                print(f"[MultiUI] ❌ Secondary start failed: {exc}", file=sys.stderr, flush=True)
                 await self.primary.send_status(f"⚠️ Telegram start failed: {type(exc).__name__}: {exc}")
+        else:
+            print(f"[MultiUI] No secondary UI", file=sys.stderr, flush=True)
 
     async def stop(self) -> None:
         await self.primary.stop()
@@ -63,15 +71,15 @@ class MultiUI(UserInterface):
             except Exception as exc:
                 await self.primary.send_status(f"⚠️ Telegram update failed: {type(exc).__name__}: {exc}")
 
-    def set_agent_info(self, name: str, profile_url: str | None) -> None:
+    def set_agent_info(self, agent_name: str, profile_url: str | None, owner_name: str = "") -> None:
         if hasattr(self.primary, "set_agent_info"):
             try:
-                self.primary.set_agent_info(name, profile_url)
+                self.primary.set_agent_info(agent_name, profile_url, owner_name)
             except Exception:
                 pass
         if self.secondary and hasattr(self.secondary, "set_agent_info"):
             try:
-                self.secondary.set_agent_info(name, profile_url)
+                self.secondary.set_agent_info(agent_name, profile_url, owner_name)
             except Exception:
                 pass
 

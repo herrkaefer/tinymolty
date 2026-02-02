@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 import httpx
 
@@ -25,9 +26,12 @@ class TelegramUI(UserInterface):
         self._offset = 0
 
     async def start(self) -> None:
+        print(f"[Telegram] 🚀 Starting Telegram UI...", file=sys.stderr, flush=True)
         self._running = True
         await self._set_bot_commands()
+        print(f"[Telegram] ✅ Bot commands set", file=sys.stderr, flush=True)
         self._poll_task = asyncio.create_task(self._poll())
+        print(f"[Telegram] ✅ Poll task created", file=sys.stderr, flush=True)
 
     async def stop(self) -> None:
         self._running = False
@@ -94,34 +98,47 @@ class TelegramUI(UserInterface):
 
     async def _poll(self) -> None:
         url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
+        print(f"[Telegram] 🔄 Poll loop started", file=sys.stderr, flush=True)
         while self._running:
-            response = await self._client.get(
-                url, params={"timeout": 5, "offset": self._offset}
-            )
-            response.raise_for_status()
-            data = response.json()
-            for update in data.get("result", []):
-                self._offset = max(self._offset, update.get("update_id", 0) + 1)
-                message = update.get("message") or {}
-                chat = message.get("chat") or {}
-                if not self.chat_id:
-                    new_chat_id = str(chat.get("id") or "")
-                    if new_chat_id:
-                        self.chat_id = new_chat_id
-                        if self._on_chat_id:
-                            await self._on_chat_id(self.chat_id)
-                        await self._send_message("✅ Telegram chat linked. Commands are now active.")
-                if self.chat_id and str(chat.get("id")) != str(self.chat_id):
-                    continue
-                text = (message.get("text") or "").strip()
-                if not text:
-                    continue
-                if text.startswith("/"):
-                    command = text.lstrip("/").split()[0].lower()
-                    if command in {"pause", "resume", "status", "quit"}:
+            try:
+                print(f"[Telegram] 🔍 Polling... (offset={self._offset})", file=sys.stderr, flush=True)
+                response = await self._client.get(
+                    url, params={"timeout": 5, "offset": self._offset}
+                )
+                response.raise_for_status()
+                data = response.json()
+                updates = data.get("result", [])
+                if updates:
+                    print(f"[Telegram] 📦 Got {len(updates)} update(s)", file=sys.stderr, flush=True)
+                for update in updates:
+                    self._offset = max(self._offset, update.get("update_id", 0) + 1)
+                    message = update.get("message") or {}
+                    chat = message.get("chat") or {}
+                    if not self.chat_id:
+                        new_chat_id = str(chat.get("id") or "")
+                        if new_chat_id:
+                            print(f"[Telegram] 🔗 Linking chat {new_chat_id}", file=sys.stderr, flush=True)
+                            self.chat_id = new_chat_id
+                            if self._on_chat_id:
+                                await self._on_chat_id(self.chat_id)
+                            await self._send_message("✅ Telegram chat linked. Commands are now active.")
+                    if self.chat_id and str(chat.get("id")) != str(self.chat_id):
+                        continue
+                    text = (message.get("text") or "").strip()
+                    if not text:
+                        continue
+                    print(f"[Telegram] 📥 Message: {text}", file=sys.stderr, flush=True)
+                    if text.startswith("/"):
+                        command = text.lstrip("/").split()[0].lower()
+                        print(f"[Telegram] 🎯 Command: {command}", file=sys.stderr, flush=True)
                         await self._command_queue.put(command)
+                        print(f"[Telegram] ✅ Queued (size={self._command_queue.qsize()})", file=sys.stderr, flush=True)
                     else:
-                        await self._command_queue.put(command)
-                else:
-                    await self._reply_queue.put(text)
+                        await self._reply_queue.put(text)
+            except asyncio.CancelledError:
+                print(f"[Telegram] 🛑 Poll cancelled", file=sys.stderr, flush=True)
+                raise
+            except Exception as exc:
+                print(f"[Telegram] ❌ Poll error: {exc}", file=sys.stderr, flush=True)
+                await asyncio.sleep(5)
             await asyncio.sleep(0.1)

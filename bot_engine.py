@@ -101,9 +101,19 @@ class BotEngine:
             await self.ui.send_status(f"   Continuing anyway - browse should work with valid API key")
 
         while self._running:
+            # Always handle commands, even when paused (so /resume and /quit work)
+            try:
+                await self._handle_commands()
+            except Exception as exc:
+                try:
+                    await self.ui.send_status(f"⚠️ Command handler error: {type(exc).__name__}")
+                except Exception:
+                    pass
+
             if self._paused:
                 await asyncio.sleep(0.2)
                 continue
+
             try:
                 await self._tick()
             except asyncio.CancelledError:

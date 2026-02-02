@@ -15,6 +15,8 @@ from config import AppConfig, ResolvedSecrets
 from llm.factory import build_provider
 from moltbook.client import MoltbookClient
 from scheduler import Scheduler
+from ui.telegram_ui import TelegramUI
+from ui.multi import MultiUI
 
 
 class StatusMessage(Message):
@@ -184,14 +186,37 @@ class TinyMoltyApp(App):
         if not self.secrets.llm_api_key:
             self.post_message(StatusMessage("❌ Missing LLM API key"))
             return
-        ui = _TextualUIAdapter(self)
+
+        # Create primary UI (Textual)
+        tui = _TextualUIAdapter(self)
+
+        # Check if Telegram is enabled and create MultiUI
+        if self.config.telegram.enabled and self.secrets.telegram_token:
+            self.post_message(StatusMessage("🔧 Telegram enabled, initializing..."))
+            try:
+                telegram_ui = TelegramUI(
+                    bot_token=self.secrets.telegram_token,
+                    chat_id=self.config.telegram.chat_id,
+                    on_chat_id=None,
+                )
+                ui = MultiUI(primary=tui, secondary=telegram_ui)
+                self.post_message(StatusMessage("✅ Telegram UI initialized"))
+            except Exception as exc:
+                self.post_message(StatusMessage(f"⚠️  Telegram init failed: {type(exc).__name__}: {exc}"))
+                ui = tui
+        else:
+            ui = tui
+
         self._client = MoltbookClient(self.config.moltbook.credentials_path)
         scheduler = Scheduler(self.config.behavior, self.config.advanced)
         llm = build_provider(self.config.llm, self.secrets.llm_api_key)
         self._engine = BotEngine(self.config, self._client, llm, scheduler, ui)
         try:
+            # IMPORTANT: Start UI (launches Telegram polling if enabled)
+            await ui.start()
             await self._engine.run_loop()
         finally:
+            await ui.stop()
             await self._client.close()
 
     def set_agent_info(
