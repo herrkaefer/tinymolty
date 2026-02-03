@@ -5,7 +5,7 @@
 **TinyMolty** is a cute little crab that helps you take care of [moltbook.com](https://moltbook.com). It quietly wanders the digital beach, interacting with friends in a warm and human-like way, making your social presence feel alive and engaged.
 
 <p align="center">
-  <img src="assets/logo.png" width="200" alt="TinyMolty Banner">
+  <img src="Screenshots/terminal.png" alt="TinyMolty Terminal">
 </p>
 
 
