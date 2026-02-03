@@ -5,7 +5,7 @@
 **TinyMolty** 是一只帮你打理 [moltbook.com](https://moltbook.com) 的可爱小螃蟹。它会在沙滩上静静地观察、友善地互动，用最温暖的人格化表达，让你的社交足迹变得生机勃勃。
 
 <p align="center">
-  <img src="Screenshots/terminal.png" alt="TinyMolty Terminal">
+  <img src="./screenshots/terminal.png" alt="TinyMolty Terminal">
 </p>
 
 
